@@ -5,8 +5,6 @@ namespace InfoBase
 {
     internal class DataBase
     {
-        public List<string> subjects; //список предметов
-        public List<string> teachers; //учителя (список имён)
         public List<Auditorium> auditoriums; //аудитории
         public List<User> users; //пользователи
 
@@ -16,6 +14,8 @@ namespace InfoBase
         public string days_path; //путь к папке с расписанием дней
         private readonly bool consoleLogging; //делать логи в консоли или нет (выключить, если нужно будет работать с визуализацией)
 
+        public string version { get; }
+        public string progname { get; }
         private int log_counter; //для LogState
         ////////////////////Переменные, необходимые для работы всей датабазы////////////////////
         ////////////////////////////////////////////////////////////////////////////////////////
@@ -340,22 +340,6 @@ namespace InfoBase
         {
             string fullPath = users_path;
             ExcelPackage excel = new(new FileInfo(fullPath));
-
-            if (old_user.access == new_user.access && old_user.access == Access.Teacher)
-            {
-                SetTeacher(old_user.name, new_user.name);
-            }
-            else if (old_user.access != new_user.access && old_user.access == Access.Teacher)
-            {
-                DeleteTeacher(old_user.name);
-                AddUser(new_user);
-            }
-            else if (old_user.access != new_user.access && new_user.access == Access.Teacher)
-            {
-                AddTeacher(new_user.name);
-                DeleteUser(old_user);
-            }
-
             ExcelWorksheet? users = excel.Workbook.Worksheets["Данные"];
             if (users == null)
             {
@@ -504,88 +488,6 @@ namespace InfoBase
                 excel.SaveAs(excelFile);
             }
             return cond;
-        }
-        public bool SetSubject(string old_subject, string new_subject)//сменить один предмет на другой
-        {
-
-            //открываем файл с данными 
-            string fullPath = data_path;
-            ExcelPackage excel = new(new FileInfo(fullPath));
-
-            //задаём списки 
-            ExcelWorksheet? subjects = excel.Workbook.Worksheets["Предметы"];
-
-            if (subjects == null)
-            {
-                LogState("Пересмотри вводимые тобой данные предметов");
-                if (consoleLogging)
-                {
-                    Console.WriteLine("Нажми кнопку для выхода");
-                    _ = Console.ReadKey();
-                }
-                return false;
-            }
-
-            int indexToIns = -1;
-            bool cond = true;
-
-            if (this.subjects.FindIndex(x => x == old_subject) != -1)
-            {
-                indexToIns = this.subjects.FindIndex(x => x == old_subject);
-            }
-            else
-            {
-                LogState("Не получилось изменить запись (возможно, заменяемого вами предмета не существует)");
-                cond = false;
-            }
-
-
-            if (teachers.Contains(old_subject))
-            {
-                int index = 1;
-                while (index <= subjects.Dimension.End.Row)
-                {
-                    string? subj = subjects.Cells[$"A{index}"].Value?.ToString();
-                    if (subj == null)
-                    {
-                    }
-                    if (subj == old_subject)
-                    {
-                        subjects.Cells[$"A{index}"].Value = new_subject;
-                    }
-                    index++;
-                }
-
-                if (cond)
-                {
-                    FileInfo excelFile = new(fullPath);
-                    excel.SaveAs(excelFile);
-
-                    teachers.Remove(old_subject);
-                    teachers.Insert(indexToIns, new_subject);
-
-                    foreach (Auditorium aud in auditoriums)
-                    {
-                        for (int i = 0; i < aud.timetable.Count; i++)
-                        {
-                            if (aud.timetable[i].name == old_subject)
-                            {
-                                Note new_n = new(aud.timetable[i])
-                                {
-                                    name = new_subject
-                                };
-                                _ = SetNote(aud.timetable[i], new_n);
-                            }
-                        }
-                    }
-                }
-                return cond;
-            }
-            else
-            {
-                LogState("Не получилось изменить запись (возможно, заменяемого вами предмета не существует)");
-                return false;
-            }
         }
 
         public bool DeleteNote(Note delete_note)//удалить запись
@@ -748,26 +650,19 @@ namespace InfoBase
                 {
                     FileInfo excelFile = new(fullPath);
                     excel.SaveAs(excelFile);
-                    if (delete_user.access == Access.Teacher)
+                    foreach (Auditorium aud in auditoriums)
                     {
-                        DeleteTeacher(delete_user.name);
-                    }
-                    else
-                    {
-                        foreach (Auditorium aud in auditoriums)
+                        for (int i = 0; i < aud.timetable.Count; i++)
                         {
-                            for (int i = 0; i < aud.timetable.Count; i++)
+                            if (aud.timetable[i].participators.Contains(delete_user))
                             {
-                                if (aud.timetable[i].participators.Contains(delete_user))
-                                {
-                                    Note note0 = new(aud.timetable[i]);
-                                    note0.participators.Remove(delete_user);
-                                    SetNote(aud.timetable[i], note0);
-                                    this.users.Remove(delete_user);
-                                    i--;
-                                }
-
+                                Note note0 = new(aud.timetable[i]);
+                                note0.participators.Remove(delete_user);
+                                SetNote(aud.timetable[i], note0);
+                                this.users.Remove(delete_user);
+                                i--;
                             }
+
                         }
                     }
                 }
@@ -894,69 +789,6 @@ namespace InfoBase
 
             return cond;
         }
-        public bool DeleteSubject(string delete_subject)//удалить предмет
-        {
-            //открываем файл с данными 
-            string fullPath = data_path;
-            ExcelPackage excel = new(new FileInfo(fullPath));
-
-            //задаём списки 
-            ExcelWorksheet? subjects = excel.Workbook.Worksheets["Предметы"];
-
-            if (subjects == null)
-            {
-                LogState("Пересмотри вводимые тобой данные предметов");
-                if (consoleLogging)
-                {
-                    Console.WriteLine("Нажми кнопку для выхода");
-                    Console.ReadKey();
-                }
-                return false;
-            }
-
-
-            if (this.subjects.Contains(delete_subject))
-            {
-                bool cond = false;
-                int index = 1;
-                while (index <= subjects.Dimension.End.Row)
-                {
-                    string? subj = subjects.Cells[$"A{index}"].Value?.ToString();
-                    if (subj == null)
-                    {
-                    }
-                    if (subj == delete_subject)
-                    {
-                        subjects.DeleteRow(index);
-                        cond = true;
-                    }
-                    index++;
-                }
-                if (cond)
-                {
-                    for (int i = 0; i < auditoriums.Count; i++)
-                    {
-                        for (int j = 0; j < auditoriums[i].timetable.Count; j++)
-                        {
-                            Note note = auditoriums[i].timetable[j];
-                            if (note.name == delete_subject)
-                            {
-                                DeleteNote(note);
-                            }
-                        }
-                    }
-                    this.subjects.Remove(delete_subject);
-                    FileInfo excelFile = new(fullPath);
-                    excel.SaveAs(excelFile);
-                }
-                return cond;
-            }
-            else
-            {
-                LogState($"Не получилось изменить запись (возможно, заменяемого вами предмета \"{delete_subject}\" не существует)");
-                return false;
-            }
-        }
 
         public bool AddNote(Note new_note)//добавить запись
         {
@@ -979,11 +811,6 @@ namespace InfoBase
         {
             string fullPath = users_path;
             ExcelPackage excel = new(new FileInfo(fullPath));
-
-            if (new_user.access == Access.Teacher)
-            {
-                AddTeacher(new_user.name);
-            }
 
             ExcelWorksheet? users = excel.Workbook.Worksheets["Данные"];
             if (users == null)
@@ -1129,72 +956,18 @@ namespace InfoBase
             }
             return right;
         }
-        public bool AddSubject(string new_subject)//добавить предмет
-        {
-
-            //открываем файл с данными 
-            string fullPath = data_path;
-            ExcelPackage excel = new(new FileInfo(fullPath));
-
-            //задаём списки 
-            ExcelWorksheet? subjects = excel.Workbook.Worksheets["Предметы"];
-
-            if (subjects == null)
-            {
-                LogState("Пересмотри вводимые тобой данные предметов");
-                if (consoleLogging)
-                {
-                    Console.WriteLine("Нажми кнопку для выхода");
-                    _ = Console.ReadKey();
-                }
-                return false;
-            }
-
-            int index = 1;
-            bool cond = false;
-            bool right = false;
-            while (index <= subjects.Dimension.End.Row)
-            {
-                string? subj = subjects.Cells[$"A{index}"].Value?.ToString();
-                if (subj == null && !cond)
-                {
-                    subjects.Cells[$"A{index}"].Value = new_subject;
-                    cond = true;
-                    right = true;
-                }
-                else if (subj == null && cond)
-                {
-                }
-                index++;
-            }
-
-            if (!cond)
-            {
-                subjects.Cells[$"A{index}"].Value = new_subject;
-                right = true;
-            }
-
-            if (right)
-            {
-                FileInfo excelFile = new(fullPath);
-                excel.SaveAs(excelFile);
-            }
-
-            return right;
-        }
-
 
         ////////////////////////////////////////////////////////////////////////////////////////
         ///////////////Базовые функции, не требующиеся в дальнейшем использовании///////////////
-        public DataBase(string logfile_path, bool consoleLogging)//конструктор 
+        public DataBase(string logfile_path, bool consoleLogging, string progname, string version)//конструктор 
         {
             log_counter = 0;
-            subjects = new();
-            teachers = new();
             auditoriums = new();
             users = new();
             this.logfile_path = logfile_path;
             this.consoleLogging = consoleLogging;
+            this.version = version;
+            this.progname = progname;
         }
         public bool FillUsers(string pathToFileUsers)//первоначальное заполнение всех пользователей 
         {
@@ -1249,26 +1022,13 @@ namespace InfoBase
             string fullPath = pathToFileData;
             data_path = fullPath;
             ExcelPackage excel = new(new FileInfo(fullPath));
-            bool cond1 = false;
-            bool cond2 = false;
             bool cond3 = true;
 
             //задаём списки 
-            ExcelWorksheet? subjects = excel.Workbook.Worksheets["Предметы"];
-            ExcelWorksheet? teachers = excel.Workbook.Worksheets["Учителя"];
             ExcelWorksheet? auditoriums = excel.Workbook.Worksheets["Кабинеты"];
 
-            if (subjects == null || teachers == null || auditoriums == null)
+            if (auditoriums == null)
             {
-                if (subjects == null)
-                {
-                    LogState("Пересмотри вводимые тобой данные предметов");
-                }
-
-                if (teachers == null)
-                {
-                    LogState("Пересмотри вводимые тобой данные учителей");
-                }
 
                 if (auditoriums == null)
                 {
@@ -1284,69 +1044,6 @@ namespace InfoBase
             }
 
             int index = 1;
-            while (index <= subjects.Dimension.End.Row)
-            {
-                string? subj = subjects.Cells[$"A{index}"].Value?.ToString();
-                if (subj == null)
-                {
-
-                }
-                else
-                {
-                    this.subjects.Add(subj);
-                    cond1 = true;
-                    index++;
-                }
-            }
-
-            index = 1;
-            List<string> temp_teachs = new();
-            while (index <= teachers.Dimension.End.Row)
-            {
-                if (index == 1)
-                {
-                    foreach (User? user in users.Where(usr => usr.access == Access.Teacher).ToList())
-                    {
-                        this.teachers.Add(user.name);
-                        temp_teachs.Add(user.name);
-                    }
-                }
-
-                ////////////////////////////////////////////////////////////////
-                string? teach = teachers.Cells[$"A{index}"].Value?.ToString();
-                if (teach == null)
-                {
-                }
-                else
-                {
-                    bool cond = true;
-                    foreach (User? user in users.Where(usr => usr.access == Access.Teacher).ToList())
-                    {
-                        if (teach == user.name) { cond = false; break; }
-                    }
-                    if (cond)
-                    {
-                        this.teachers.Add(teach);
-                    }
-
-                    cond = true;
-                    cond2 = true;
-                    index++;
-                }
-                ////////////////////////////////////////////////////////////////
-            }
-            if (this.teachers.Except(temp_teachs).ToList().Count != 0)
-            {
-                string mes = "Списки учителей не совпадают со списком пользователей с доступом Teacher\nНехватает следующих учителей в списке :\n";
-                foreach (string? str in this.teachers.Except(temp_teachs).ToList())
-                {
-                    mes += str + '\n';
-                }
-                LogState(mes);
-                return false;
-            }
-
-            index = 1;
             while (index <= auditoriums.Dimension.End.Row)
             {
                 string? codeName = auditoriums.Cells[$"A{index}"].Value?.ToString();
@@ -1401,17 +1098,8 @@ namespace InfoBase
                     index++;
                 }
             }
-            if (!cond1)
-            {
-                LogState("Пересмотри вводимые тобой данные предметов (возможно, в них нету ничего)");
-            }
 
-            if (!cond2)
-            {
-                LogState("Пересмотри вводимые тобой данные учителей (возможно, в них нету ничего)");
-            }
-
-            return cond1 && cond2 && cond3;
+            return cond3;
         }
         public bool FillDays(string pathToDirDays)//первоначальное заполнение всех броней 
         {
@@ -1496,225 +1184,16 @@ namespace InfoBase
             }
             return result;
         }
-        bool SetTeacher(string old_teacher, string new_teacher)//сменить одного учителя на другого
-        {
-            //открываем файл с данными 
-            string fullPath = data_path;
-            ExcelPackage excel = new(new FileInfo(fullPath));
 
-            //задаём списки 
-            ExcelWorksheet? teachers = excel.Workbook.Worksheets["Учителя"];
-
-            if (teachers == null)
-            {
-                LogState("Пересмотри вводимые тобой данные учителей");
-                if (consoleLogging)
-                {
-                    Console.WriteLine("Нажми кнопку для выхода");
-                    _ = Console.ReadKey();
-                }
-                return false;
-            }
-
-
-            int indexToIns = -1;
-
-            if (this.teachers.FindIndex(x => x == old_teacher) != -1)
-            {
-                indexToIns = this.teachers.FindIndex(x => x == old_teacher);
-            }
-            else
-            {
-                LogState("Не получилось изменить запись (возможно, заменяемой вами записи не существует)");
-                return false;
-            }
-
-            if (DeleteTeacher(old_teacher))
-            {
-                AddTeacher(new_teacher);
-
-                foreach (User? user in users.Where(usr => usr.access == Access.Teacher).ToList())
-                {
-                    if (user.name == old_teacher)
-                    {
-                        User new_u = new(user)
-                        {
-                            name = new_teacher
-                        };
-                        _ = SetUser(user, new_u);
-                        break;
-                    }
-                }
-
-                int index = 1;
-                while (index <= teachers.Dimension.End.Row)
-                {
-                    string? teacher0 = teachers.Cells[$"A{index}"].Value?.ToString();
-                    if (teacher0 == null)
-                    {
-                        break;
-                    }
-
-                    if (teacher0 == old_teacher)
-                    {
-                        teachers.Cells[$"A{index}"].Value = new_teacher;
-                    }
-                    index++;
-                }
-                FileInfo excelFile = new(fullPath);
-                excel.SaveAs(excelFile);
-            }
-            else
-            {
-                LogState("Не получилось изменить запись (возможно, заменяемого вами учителя не существует)");
-                return false;
-            }
-
-            return true;
-        }
-        bool DeleteTeacher(string delete_teacher)
-        {
-            //открываем файл с данными 
-            string fullPath = data_path;
-            ExcelPackage excel = new(new FileInfo(fullPath));
-
-            //задаём списки 
-            ExcelWorksheet? teachers = excel.Workbook.Worksheets["Учителя"];
-
-            if (teachers == null)
-            {
-                LogState("Пересмотри вводимые тобой данные учителей");
-                if (consoleLogging)
-                {
-                    Console.WriteLine("Нажми кнопку для выхода");
-                    Console.ReadKey();
-                }
-                return false;
-            }
-            bool cond = true;
-
-            if (this.teachers.Contains(delete_teacher))
-            {
-                int index = 1;
-                while (index <= teachers.Dimension.End.Row)
-                {
-                    string? teacher0 = teachers.Cells[$"A{index}"].Value?.ToString();
-                    if (teacher0 == null)
-                    {
-
-                    }
-
-                    if (teacher0 == delete_teacher)
-                    {
-                        teachers.DeleteRow(index);
-                        cond = true;
-                    }
-                    index++;
-                }
-
-                if (cond)
-                {
-                    foreach (User? user in users.Where(usr => usr.access == Access.Teacher).ToList())
-                    {
-                        if (user.name == delete_teacher)
-                        {
-                            users.Remove(user);
-                            break;
-                        }
-                    }
-
-                    foreach (Auditorium aud in auditoriums)
-                    {
-                        for (int i = 0; i < aud.timetable.Count; i++)
-                        {
-                            if (aud.timetable[i].teacher.name == delete_teacher)
-                            {
-                                DeleteNote(aud.timetable[i]);
-                                i--;
-                            }
-                        }
-                    }
-
-                    this.teachers.Remove(delete_teacher);
-                }
-
-            }
-            else
-            {
-                LogState("Не получилось изменить запись (возможно, заменяемого вами учителя не существует)");
-                return false;
-            }
-
-            if (cond)
-            {
-                FileInfo excelFile = new(fullPath);
-                excel.SaveAs(excelFile);
-
-            }
-            return cond;
-        }
-        bool AddTeacher(string new_teacher)
-        {
-            //открываем файл с данными 
-            string fullPath = data_path;
-            ExcelPackage excel = new(new FileInfo(fullPath));
-
-            //задаём списки 
-            ExcelWorksheet? teachers = excel.Workbook.Worksheets["Учителя"];
-
-            if (teachers == null)
-            {
-                LogState("Пересмотри вводимые тобой данные учителей");
-                if (consoleLogging)
-                {
-                    Console.WriteLine("Нажми кнопку для выхода");
-                    _ = Console.ReadKey();
-                }
-                return false;
-            }
-
-            int index = 1;
-            bool cond = false;
-            while (index <= teachers.Dimension.End.Row)
-            {
-                string? teacher0 = teachers.Cells[$"A{index}"].Value?.ToString();
-                if (teacher0 == null)
-                {
-                    teachers.Cells[$"A{index}"].Value = new_teacher;
-                    cond = true;
-                    break;
-                }
-                index++;
-            }
-            if (!cond)
-            {
-                teachers.Cells[$"A{index}"].Value = new_teacher;
-                cond = true;
-            }
-
-            if (cond)
-            {
-                FileInfo excelFile = new(fullPath);
-                excel.SaveAs(excelFile);
-            }
-            return cond;
-        }
         public bool CreateDataList(string fileName)//создание макета списка данных 
         {
             //создаем новый документ 
             ExcelPackage excel = new();
 
             //добавляем лист 
-            ExcelWorksheet worksheet1 = excel.Workbook.Worksheets.Add("Учителя");
-            ExcelWorksheet worksheet2 = excel.Workbook.Worksheets.Add("Предметы");
             ExcelWorksheet worksheet3 = excel.Workbook.Worksheets.Add("Кабинеты");
 
             //добавляем данные 
-            worksheet1.Cells["A1"].Value = "Учителя";
-            worksheet1.Column(1).Width = 100;
-
-            worksheet2.Cells["A1"].Value = "Предметы";
-            worksheet2.Column(1).Width = 100;
 
             worksheet3.Cells["A1"].Value = "Кодовый номер";
             worksheet3.Column(1).Width = 15.5;

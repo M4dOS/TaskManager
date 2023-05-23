@@ -11,10 +11,9 @@ namespace InfoBase
             Console.OutputEncoding = Encoding.Unicode;
 
             //задаём неизменные параметры
-            const int consoleX = 150; //длина консоли
-            const int consoleY = 50; //высота консоли
             const bool isDebug = true; //переключатель между режимом дебага и обычным режимом (логирование работает в обоих случаях)
-            const string version = "v0.0.1321 alpha"; //строка версии (смотри правила оформления ниже)
+            const string version = "v1.0.1317 alpha"; //строка версии (смотри правила оформления ниже)
+            const string progname = "Auditions";
 
             /*///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
             Оформлять строку version в соответствии с правилом:
@@ -34,22 +33,7 @@ namespace InfoBase
             //настройка для EPPlus 
             ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 
-            const string info = "Auditions" + " " + version;
-
-            //прописываем настройки консоли
-            Console.SetWindowSize(consoleX, consoleY);
-            if (isDebug)
-            {
-                int countBuferScreens = 5;
-                Console.SetBufferSize(consoleX, (consoleY + 1) * countBuferScreens);
-            }
-            else
-            {
-                Console.SetBufferSize(consoleX, consoleY);
-            }
-
-            Console.CursorVisible = false;
-            Console.Title = info;
+            /*const string info = progname + " " + version;*/
 
             //константы для файлов 
             string workDir = Directory.GetCurrentDirectory() + @"\data\";
@@ -57,7 +41,7 @@ namespace InfoBase
             string logsDir = workDir + @"logs\";
 
             //подготовка датабазы 
-            DataBase db = new(logsDir, isDebug);
+            DataBase db = new(logsDir, isDebug, progname, version);
             if (!File.Exists(workDir + "Data.xlsx"))
             {
                 db.CreateDataList(workDir + "Data.xlsx");
@@ -114,7 +98,7 @@ namespace InfoBase
 
             else
             {
-                db.LogState($"Начало работы программы: {DateTime.Now.ToString("F")}{DateTime.Now.ToString(".fff")}"); //просто нужно
+                db.LogState($"Начало работы программы. Имя программы: {db.progname}. Текущая версия программы: {db.version}"); //просто нужно
                 while (true)
                 {
                     
