@@ -11,9 +11,9 @@ namespace InfoBase
             Console.OutputEncoding = Encoding.Unicode;
 
             //задаём неизменные параметры
-            const bool isDebug = true; //переключатель между режимом дебага и обычным режимом (логирование работает в обоих случаях)
-            const string version = "v1.0.1317 alpha"; //строка версии (смотри правила оформления ниже)
-            const string progname = "Auditions";
+            const bool isDebug = true;//переключатель между режимом дебага и обычным режимом (логирование работает в обоих случаях) 
+            const string version = "v0.1.2149 alpha";//строка версии (смотри правила оформления ниже) 
+            const string progname = "Task Manager";
 
             /*///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
             Оформлять строку version в соответствии с правилом:
@@ -37,7 +37,7 @@ namespace InfoBase
 
             //константы для файлов 
             string workDir = Directory.GetCurrentDirectory() + @"\data\";
-            string daysDir = workDir + @"days\";
+            string daysDir = workDir + @"desks\";
             string logsDir = workDir + @"logs\";
 
             //подготовка датабазы 
@@ -59,7 +59,6 @@ namespace InfoBase
                 if (isDebug)
                 {
                     db.LogState($"Возникла ошибка, проверьте лог {DateTime.Now:yyyy-MM-dd}.log");
-                    Console.ReadKey();
                 }
             }
             else if (!db.FillData(workDir + "Data.xlsx"))
@@ -68,7 +67,6 @@ namespace InfoBase
                 if (isDebug)
                 {
                     db.LogState($"Возникла ошибка, проверьте лог {DateTime.Now:yyyy-MM-dd}.log");
-                    Console.ReadKey();
                 }
             }
             else if (!db.FillDays(daysDir))
@@ -77,7 +75,6 @@ namespace InfoBase
                 if (isDebug)
                 {
                     db.LogState($"Возникла ошибка, проверьте лог {DateTime.Now:yyyy-MM-dd}.log");
-                    Console.ReadKey();
                 }
             }
             /////////////////////////////////////////код выше трогать запрещено//////////////////////////////////////////////////////
@@ -98,12 +95,10 @@ namespace InfoBase
 
             else
             {
-                db.LogState($"Начало работы программы. Имя программы: {db.progname}. Текущая версия программы: {db.version}"); //просто нужно
+                db.LogState($"Начало работы программы. Имя программы: {db.progname}. Текущая версия программы: {db.version}");//просто нужно 
                 while (true)
                 {
                     
-
-
                 }
             }
         }

@@ -1,30 +1,35 @@
 ﻿using OfficeOpenXml;
-
+using TaskManager;
 
 namespace InfoBase
 {
     internal class DataBase
     {
-        public List<Auditorium> auditoriums; //аудитории
-        public List<User> users; //пользователи
+        public List<Desk> desks;//доски с заданиями 
+        public List<User> users;//пользователи 
 
-        public string logfile_path; //путь к папке с логами
-        public string data_path; //путь к таблице с данными
-        public string users_path; //путь к таблице с юзерами
-        public string days_path; //путь к папке с расписанием дней
-        private readonly bool consoleLogging; //делать логи в консоли или нет (выключить, если нужно будет работать с визуализацией)
+        public List<string> user_ids;//все идентификаторы пользователей 
+        public List<string> desk_ids;//все идентификаторы досок 
+        public List<string> card_ids;//все идентификаторы карточек 
 
-        public string version { get; }
-        public string progname { get; }
+        public string logfile_path; //путь к папке с логами 
+        public string data_path; //путь к таблице с данными 
+        public string users_path; //путь к таблице с юзерами 
+        public string cards_path; //путь к папке с карточками 
+        private readonly bool consoleLogging;//делать логи в консоли или нет (выключить, если нужно будет работать с визуализацией) 
+
+        public string version { get; }//версия программы 
+        public string progname { get; }//имя программы 
         private int log_counter; //для LogState
         ////////////////////Переменные, необходимые для работы всей датабазы////////////////////
         ////////////////////////////////////////////////////////////////////////////////////////
 
         //некоторые вспомогательные инструменты
-        public static DateTime Date(string date)//для дат формата "dd.MM.yyyy hh:mm" (при неудаче форматирует как "yyyy.MM.dd hh:mm")
+        public static DateTime Date(string date)//для дат формата "dd.MM.yyyy hh:mm" (при первой неудаче форматирует как "yyyy.MM.dd hh:mm")
         {
             string[] datenums = date.Split(' ')[0].Split('.');
             string[] timenums = date.Split(' ')[1].Split(':');
+            string error = String.Empty;
             DateTime data;
             try
             {
@@ -32,14 +37,26 @@ namespace InfoBase
                                 int.Parse(timenums[0]), int.Parse(timenums[1]), 0);
                 return data;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                error = ex.Message;
                 data = new DateTime(int.Parse(datenums[2]), int.Parse(datenums[1]), int.Parse(datenums[0]),
                                 int.Parse(timenums[0]), int.Parse(timenums[1]), 0);
                 return data;
             }
         }
-        public void LogState(string message)//логирование всего 
+        public string? CreateDayList(string card_id)//создание макета списка дня 
+        {
+            //создаем новый документ 
+            string fullPath = cards_path + card_id + ".desk";
+
+            if (!File.Exists(fullPath)) { File.Create(fullPath); return null; }
+            else
+            {
+                return fullPath;
+            }
+        }
+        public void LogState(string message)//логирование 
         {
             log_counter++;
             bool newFile = false;
@@ -83,106 +100,41 @@ namespace InfoBase
                 }
             }
         }
-        public User RandLogPass(string name, string access)
+        public User RandLogPass(string name)//создание автоматически сгенерированного пользователя
         {
             // Создание генератора случайных чисел
             Random random = new Random();
 
             // Создание случайного логина
-            string login = "user" + random.Next(100000, 999999);
+            string login = "user" + user_ids.Count+1;
 
             // Создание случайного пароля
             const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-            string password = new string(Enumerable.Repeat(chars, 8)
-              .Select(s => s[random.Next(s.Length)]).ToArray());
+            string password = new string(Enumerable.Repeat(chars, 8).Select(s => s[random.Next(s.Length)]).ToArray());
 
             LogState($"Успешно зарезервирован в памяти пользователь: {login}|{password}");
-            return new(login, password, access, name, this);
-        }
-        public bool Update()
-        {
-            if (!FillUsers(users_path))
-            {
-                LogState("Проблема со списком пользователей или ошибка FillUsers()");
-                if (consoleLogging)
-                {
-                    LogState($"Возникла ошибка, проверьте лог {DateTime.Now:yyyy-MM-dd}.log");
-                    Console.ReadKey();
-                }
-                return false;
-            }
-            else if (!FillData(data_path))
-            {
-                LogState("Проблема с базовыми данными или ошибка FillData()");
-                if (consoleLogging)
-                {
-                    LogState($"Возникла ошибка, проверьте лог {DateTime.Now:yyyy-MM-dd}.log");
-                    Console.ReadKey();
-                }
-                return false;
-            }
-            else if (!FillDays(days_path))
-            {
-                LogState("Проблема с данными расписания или ошибка FillDays()");
-                if (consoleLogging)
-                {
-                    LogState($"Возникла ошибка, проверьте лог {DateTime.Now:yyyy-MM-dd}.log");
-                    Console.ReadKey();
-                }
-                return false;
-            }
-            else
-            {
-                return true;
-            }
+            return new(login, password, name, this);
         }
 
         //рабочие инструменты базы данных
-        public User? GetUser(string name, bool mode)//найти класс User по определённому параметру 
+        public User? GetUser(string id)//найти пользователя по идентификатору 
         {
             bool cond = false;
-            switch (mode)
+            foreach (User user in users)
             {
-                case false: //поиск по имени
-                    foreach (User user in users)
-                    {
-                        if (user.name == name)
-                        {
-                            cond = true;
-                            return user;
-                        }
-                    }
-                    break;
-
-                case true: //поиск по логину
-                    foreach (User user in users)
-                    {
-                        if (user.login == name) { cond = true; return user; }
-                    }
-                    break;
+                if (user.id == id)
+                {
+                    cond = true;
+                    return user;
+                }
             }
-
-            switch (mode)
+            if (!cond)
             {
-                case false:
-                    if (!cond)
-                    {
-                        LogState($"Пользователя с именем {name} нету в базе данных");
-                    }
-
-                    break;
-
-                case true:
-                    if (!cond)
-                    {
-                        LogState($"Пользователя с логином {name} нету в базе данных");
-                    }
-
-                    break;
+                LogState($"Пользователя с идентификатором {id} нету в базе данных");
             }
             return null;
         }
-        public User? GetFullUser(string login, string name)//найти класс User по логину и имени 
+        public User? GetFullUser(string login, string name)//найти пользователя по логину и имени 
         {
             bool cond = false;
             foreach (User user in users)
@@ -196,53 +148,62 @@ namespace InfoBase
 
             return null;
         }
-        public Note? GetNote(DateTime time)//взять запись, которая находится в рамках [начальное время;конечное время) 
+        public Card? GetCard(string id)//найти карточку по идентификатору 
         {
-            foreach (Auditorium auditory in auditoriums)
+            foreach (var desk in desks)
             {
-                foreach (Note note in auditory.timetable)
+                foreach (var card in desk.cards)
                 {
-                    if (note.startTime <= time && time < note.endTime)
+                    if (card.id == id)
                     {
-                        return note;
+                        return card;
                     }
                 }
             }
-            LogState($"Нету никаких записей в данное время: {time:dd.MM.yyy HH:mm}");
+            LogState($"Не найдено задания с идентификатором {id}");
             return null;
         }
-        public Auditorium? GetAuditorium(string tag)//найти аудиторию по имени 
+        public Desk? GetDesk(string id)//найти доску по идентификатору 
         {
-            foreach (Auditorium auditor in auditoriums)
+            foreach (Desk desk in desks)
             {
-                if (auditor.tag == tag)
+                if (desk.id == id)
                 {
-                    return auditor;
+                    return desk;
                 }
             }
-            LogState($"Аудитория с номером {tag} не найдена");
+            LogState($"Аудитория с номером {id} не найдена");
             return null;
         }
 
-        public bool SetNote(Note old_note, Note new_note)//сменить одну запись на другую
+        public bool MoveCard()///смещение позиции карточки на доске 
+        { return true; }
+        public bool MoveDesk()///смещение позиции доски в списке всех досок 
+        { return true; }
+        public bool MoveUser()///смещение позиции пользователя в списке всех пользователей 
+        { return true; }
+        public bool MoveTask()///смещение позиции пункта в чек-листе 
+        { return true; }
+
+        public bool SetCard(Card old_card, Card new_card)///сменить одну карточку на другую 
         {
-            Auditorium aud = GetAuditorium(old_note.auditorium.tag);
-            if (aud.timetable.Remove(old_note))
+            Desk desk = GetDesk(old_card.desk.id);
+            if (desk.timetable.Remove(old_card))
             {
-                _ = aud.AddNote(new_note, this);
+                _ = desk.AddCard(new_card, this);
                 string filePath;
 
                 try
                 {
-                    filePath = days_path + old_note.startTime.ToString("yyyy.MM.dd") + ".day"; // путь к файлу
+                    filePath = cards_path + old_card.startTime.ToString("yyyy.MM.dd") + ".desk"; // путь к файлу
                 }
                 catch (Exception ex) { LogState($"Возникла следующая ошибка: {ex}"); return false; }
 
                 /*Название предмета 1 | 9:00 | 10:00 | Преподаватель 1 | Доп описание для Название предмета 1 1 | a1*/
-                string searchLine = old_note.name + '|' + old_note.startTime.ToString("H:mm") + '|' + old_note.endTime.ToString("H:mm") + '|'
-                                    + old_note.teacher.name + '|' + old_note.subname + '|' + old_note.auditorium.tag;// строка, которую нужно заменить
-                string newLine = new_note.name + '|' + new_note.startTime.ToString("H:mm") + '|' + new_note.endTime.ToString("H:mm") + '|'
-                                 + new_note.teacher.name + '|' + new_note.subname + '|' + new_note.auditorium.tag; // новая строка, которой заменится найденная строка
+                string searchLine = old_card.name + '|' + old_card.startTime.ToString("H:mm") + '|' + old_card.endTime.ToString("H:mm") + '|'
+                                    + old_card.teacher.name + '|' + old_card.subname + '|' + old_card.desk.id;// строка, которую нужно заменить
+                string newLine = new_card.name + '|' + new_card.startTime.ToString("H:mm") + '|' + new_card.endTime.ToString("H:mm") + '|'
+                                 + new_card.teacher.name + '|' + new_card.subname + '|' + new_card.desk.id; // новая строка, которой заменится найденная строка
 
                 // Открываем файл для чтения и записи
                 try
@@ -277,7 +238,7 @@ namespace InfoBase
                             {
                                 writer.WriteLine(newLine);
                                 lineFound = true;
-                                foreach (User user in new_note.participators)
+                                foreach (User user in new_card.participators)
                                 {
                                     writer.WriteLine($"{user.login}|{user.name}");
                                 }
@@ -336,11 +297,12 @@ namespace InfoBase
                 return false;
             }
         }
-        public bool SetUser(User old_user, User new_user)//сменить одного юзера на другого
+        public bool SetUser(User old_user, User new_user)///сменить одного пользователя на другого 
         {
             string fullPath = users_path;
             ExcelPackage excel = new(new FileInfo(fullPath));
             ExcelWorksheet? users = excel.Workbook.Worksheets["Данные"];
+
             if (users == null)
             {
                 LogState("Пересмотри данные пользователей");
@@ -408,16 +370,16 @@ namespace InfoBase
                 return false;
             }
         }
-        public bool SetAuditorium(Auditorium old_aud, Auditorium new_aud)//сменить одну аудиторию на другую
+        public bool SetDesk(Desk old_desk, Desk new_desk)///сменить одну доску на другую 
         {
             //открываем файл с данными 
             string fullPath = data_path;
             ExcelPackage excel = new(new FileInfo(fullPath));
 
             //задаём списки 
-            ExcelWorksheet? auditoriums = excel.Workbook.Worksheets["Кабинеты"];
+            ExcelWorksheet? desks = excel.Workbook.Worksheets["Доски"];
 
-            if (auditoriums == null)
+            if (desks == null)
             {
                 LogState("Пересмотри вводимые тобой данные кабинетов");
                 if (consoleLogging)
@@ -429,9 +391,9 @@ namespace InfoBase
             }
 
             int indexToIns = -1;
-            if (this.auditoriums.FindIndex(x => x == old_aud) != -1)
+            if (this.desks.FindIndex(x => x == old_desk) != -1)
             {
-                indexToIns = this.auditoriums.FindIndex(x => x == old_aud);
+                indexToIns = this.desks.FindIndex(x => x == old_desk);
             }
             else
             {
@@ -441,16 +403,16 @@ namespace InfoBase
 
 
             bool cond = true;
-            if (this.auditoriums.Remove(old_aud))
+            if (this.desks.Remove(old_desk))
             {
-                this.auditoriums.Insert(indexToIns, new_aud);
+                this.desks.Insert(indexToIns, new_desk);
                 int index = 1;
-                while (index <= auditoriums.Dimension.End.Row)
+                while (index <= desks.Dimension.End.Row)
                 {
-                    string? codeName = auditoriums.Cells[$"A{index}"].Value?.ToString();
-                    string? startTime = auditoriums.Cells[$"B{index}"].Value?.ToString().Split(' ')[1];
-                    string? endTime = auditoriums.Cells[$"C{index}"].Value?.ToString().Split(' ')[1];
-                    string? capacity = auditoriums.Cells[$"D{index}"].Value?.ToString();
+                    string? codeName = desks.Cells[$"A{index}"].Value?.ToString();
+                    string? startTime = desks.Cells[$"B{index}"].Value?.ToString().Split(' ')[1];
+                    string? endTime = desks.Cells[$"C{index}"].Value?.ToString().Split(' ')[1];
+                    string? capacity = desks.Cells[$"D{index}"].Value?.ToString();
                     if (codeName == null || startTime == null || endTime == null || capacity == null)
                     {
                         if (codeName == null && startTime == null && endTime == null && capacity == null)
@@ -462,15 +424,15 @@ namespace InfoBase
                             LogState($"Строка данных пользователя {index} выглядит неполной");
                         }
                     }
-                    else if (old_aud.tag == codeName && old_aud.startTime + ":00" == startTime && old_aud.endTime + ":00" == endTime
-                            && old_aud.capacity == int.Parse(capacity))
+                    else if (old_desk.id == codeName && old_desk.startTime + ":00" == startTime && old_desk.endTime + ":00" == endTime
+                            && old_desk.capacity == int.Parse(capacity))
                     {
-                        auditoriums.Cells.SetCellValue(index - 1, 0, new_aud.tag);
-                        auditoriums.Cells["B1"].Value = Date("01.01.2000 " + new_aud.startTime);
-                        auditoriums.Cells["B1"].Style.Numberformat.Format = "H:mm";
-                        auditoriums.Cells["C1"].Value = Date("01.01.2000 " + new_aud.endTime);
-                        auditoriums.Cells["C1"].Style.Numberformat.Format = "H:mm";
-                        auditoriums.Cells.SetCellValue(index - 1, 3, new_aud.capacity);
+                        desks.Cells.SetCellValue(index - 1, 0, new_desk.id);
+                        desks.Cells["B1"].Value = Date("01.01.2000 " + new_desk.startTime);
+                        desks.Cells["B1"].Style.Numberformat.Format = "H:mm";
+                        desks.Cells["C1"].Value = Date("01.01.2000 " + new_desk.endTime);
+                        desks.Cells["C1"].Style.Numberformat.Format = "H:mm";
+                        desks.Cells.SetCellValue(index - 1, 3, new_desk.capacity);
                         break;
                     }
                     index++;
@@ -490,23 +452,23 @@ namespace InfoBase
             return cond;
         }
 
-        public bool DeleteNote(Note delete_note)//удалить запись
+        public bool DeleteCard(Card delete_card)///удалить карточку 
         {
-            Auditorium aud = delete_note.auditorium;
-            if (aud.timetable.Remove(delete_note))
+            Desk desk = delete_card.desk;
+            if (desk.timetable.Remove(delete_card))
             {
                 string filePath;
 
                 try
                 {
-                    filePath = days_path + delete_note.startTime.ToString("yyyy.MM.dd") + ".day"; // путь к файлу
+                    filePath = cards_path + delete_card.startTime.ToString("yyyy.MM.dd") + ".desk"; // путь к файлу
                 }
                 catch (Exception ex) { LogState($"Ошибка: {ex}"); return false; }
                 bool sucess = false;
 
                 /*Название предмета 1 | 9:00 | 10:00 | Преподаватель 1 | Доп описание для Название предмета 1 1 | a1*/
-                string searchLine = delete_note.name + '|' + delete_note.startTime.ToString("H:mm") + '|' + delete_note.endTime.ToString("H:mm") + '|'
-                                    + delete_note.teacher.name + '|' + delete_note.subname + '|' + delete_note.auditorium.tag;// строка, которую нужно заменить
+                string searchLine = delete_card.name + '|' + delete_card.startTime.ToString("H:mm") + '|' + delete_card.endTime.ToString("H:mm") + '|'
+                                    + delete_card.teacher.name + '|' + delete_card.subname + '|' + delete_card.desk.id;// строка, которую нужно заменить
 
                 // Открываем файл для чтения и записи
                 try
@@ -601,7 +563,7 @@ namespace InfoBase
                 return false;
             }
         }
-        public bool DeleteUser(User delete_user)//удалить юзера
+        public bool DeleteUser(User delete_user)///удалить пользователя 
         {
             string fullPath = users_path;
             ExcelPackage excel = new(new FileInfo(fullPath));
@@ -650,21 +612,28 @@ namespace InfoBase
                 {
                     FileInfo excelFile = new(fullPath);
                     excel.SaveAs(excelFile);
-                    foreach (Auditorium aud in auditoriums)
+                    /*if (delete_user.access == Access.Teacher)
                     {
-                        for (int i = 0; i < aud.timetable.Count; i++)
+                        DeleteTeacher(delete_user.name);
+                    }
+                    else
+                    {*/
+                    foreach (Desk desk in desks)
+                    {
+                        for (int i = 0; i < desk.timetable.Count; i++)
                         {
-                            if (aud.timetable[i].participators.Contains(delete_user))
+                            if (desk.timetable[i].participators.Contains(delete_user))
                             {
-                                Note note0 = new(aud.timetable[i]);
-                                note0.participators.Remove(delete_user);
-                                SetNote(aud.timetable[i], note0);
+                                Card card0 = new(desk.timetable[i]);
+                                card0.participators.Remove(delete_user);
+                                SetCard(desk.timetable[i], card0);
                                 this.users.Remove(delete_user);
                                 i--;
                             }
 
                         }
                     }
+                    /*}*/
                 }
 
                 return cond;
@@ -676,16 +645,16 @@ namespace InfoBase
                 return false;
             }
         }
-        public bool DeleteAuditorium(Auditorium delete_aud)//удалить аудиторию
+        public bool DeleteDesk(Desk delete_desk)///удалить доску 
         {
             //открываем файл с данными 
             string fullPath = data_path;
             ExcelPackage excel = new(new FileInfo(fullPath));
 
             //задаём списки 
-            ExcelWorksheet? auditoriums = excel.Workbook.Worksheets["Кабинеты"];
+            ExcelWorksheet? desks = excel.Workbook.Worksheets["Доски"];
 
-            if (auditoriums == null)
+            if (desks == null)
             {
                 LogState("Пересмотри вводимые тобой данные кабинетов");
                 if (consoleLogging)
@@ -697,16 +666,16 @@ namespace InfoBase
             }
 
             bool cond = true;
-            if (GetAuditorium(delete_aud.tag) != null)
+            if (GetDesk(delete_desk.id) != null)
             {
                 int index = 1;
-                while (index <= auditoriums.Dimension.End.Row)
+                while (index <= desks.Dimension.End.Row)
                 {
-                    string? codeName = auditoriums.Cells[$"A{index}"].Value?.ToString();
+                    string? codeName = desks.Cells[$"A{index}"].Value?.ToString();
                     DateTime timeValue;
 
                     string? startTime;
-                    ExcelRange startTime0 = auditoriums.Cells[$"B{index}"];
+                    ExcelRange startTime0 = desks.Cells[$"B{index}"];
                     try
                     {
                         timeValue = DateTime.FromOADate(startTime0.GetValue<double>());
@@ -721,7 +690,7 @@ namespace InfoBase
 
 
                     string? endTime;
-                    ExcelRange endTime0 = auditoriums.Cells[$"C{index}"];
+                    ExcelRange endTime0 = desks.Cells[$"C{index}"];
                     try
                     {
                         timeValue = DateTime.FromOADate(endTime0.GetValue<double>());
@@ -733,7 +702,7 @@ namespace InfoBase
                         endTime = timeValue.ToString("H:mm");
 
                     }
-                    string? capacity = auditoriums.Cells[$"D{index}"].Value?.ToString();
+                    string? capacity = desks.Cells[$"D{index}"].Value?.ToString();
 
 
                     if (codeName == null || startTime == null || endTime == null || capacity == null)
@@ -747,10 +716,10 @@ namespace InfoBase
                             cond = false;
                         }
                     }
-                    else if (delete_aud.tag == codeName && delete_aud.startTime == startTime && delete_aud.endTime == endTime
-                            && delete_aud.capacity == int.Parse(capacity))
+                    else if (delete_desk.id == codeName && delete_desk.startTime == startTime && delete_desk.endTime == endTime
+                            && delete_desk.capacity == int.Parse(capacity))
                     {
-                        auditoriums.DeleteRow(index);
+                        desks.DeleteRow(index);
                         break;
                     }
                     else
@@ -769,20 +738,20 @@ namespace InfoBase
             {
                 FileInfo excelFile = new(fullPath);
                 excel.SaveAs(excelFile);
-                delete_aud = GetAuditorium(delete_aud.tag);
-                for (int i = 0; i < this.auditoriums.Count; i++)
+                delete_desk = GetDesk(delete_desk.id);
+                for (int i = 0; i < this.desks.Count; i++)
                 {
-                    if (delete_aud == this.auditoriums[i])
+                    if (delete_desk == this.desks[i])
                     {
-                        for (int j = 0; j < this.auditoriums[i].timetable.Count; j++)
+                        for (int j = 0; j < this.desks[i].timetable.Count; j++)
                         {
-                            Note note = this.auditoriums[i].timetable[j];
-                            if (note.auditorium.tag == delete_aud.tag)
+                            Card card = this.desks[i].timetable[j];
+                            if (card.desk.id == delete_desk.id)
                             {
-                                DeleteNote(note);
+                                DeleteCard(card);
                             }
                         }
-                        this.auditoriums.RemoveAt(i);
+                        this.desks.RemoveAt(i);
                     }
                 }
             }
@@ -790,28 +759,27 @@ namespace InfoBase
             return cond;
         }
 
-        public bool AddNote(Note new_note)//добавить запись
+        public bool AddCard(Card new_card)///добавить карточку 
         {
-            Auditorium aud = GetAuditorium(new_note.auditorium.tag);
-            if (aud.AddNote(new_note, this))
+            Desk desk = GetDesk(new_card.desk.id);
+            if (desk.AddCard(new_card, this))
             {
-                using StreamWriter writer = new(CreateDayList(new_note.startTime.ToString("yyyy.MM.dd")), true);
-                string newLine = new_note.name + '|' + new_note.startTime.ToString("H:mm") + '|' + new_note.endTime.ToString("H:mm") + '|'
-                        + new_note.teacher.name + '|' + new_note.subname + '|' + new_note.auditorium.tag; // новая строка, которой заменится найденная строка
+                using StreamWriter writer = new(CreateDayList(new_card.startTime.ToString("yyyy.MM.dd")), true);
+                string newLine = new_card.name + '|' + new_card.startTime.ToString("H:mm") + '|' + new_card.endTime.ToString("H:mm") + '|'
+                        + new_card.teacher.name + '|' + new_card.subname + '|' + new_card.desk.id; // новая строка, которой заменится найденная строка
                 writer.WriteLine(newLine);
                 return true;
             }
             else
             {
-                LogState($"Добавление записи \"{new_note.name}\" безуспешно завершено");
+                LogState($"Добавление записи \"{new_card.name}\" безуспешно завершено");
                 return false;
             }
         }
-        public bool AddUser(User new_user)//добавить юзера
+        public bool AddUser(User new_user)///добавить пользователя 
         {
             string fullPath = users_path;
             ExcelPackage excel = new(new FileInfo(fullPath));
-
             ExcelWorksheet? users = excel.Workbook.Worksheets["Данные"];
             if (users == null)
             {
@@ -861,16 +829,16 @@ namespace InfoBase
             }
             return right;
         }
-        public bool AddAuditorium(Auditorium new_aud)//добавить аудиторию
+        public bool AddDesk(Desk new_desk)///добавить доску 
         {
             //открываем файл с данными 
             string fullPath = data_path;
             ExcelPackage excel = new(new FileInfo(fullPath));
 
             //задаём списки 
-            ExcelWorksheet? auditoriums = excel.Workbook.Worksheets["Кабинеты"];
+            ExcelWorksheet? desks = excel.Workbook.Worksheets["Доски"];
 
-            if (auditoriums == null)
+            if (desks == null)
             {
                 LogState("Пересмотри вводимые тобой данные кабинетов");
                 if (consoleLogging)
@@ -884,13 +852,13 @@ namespace InfoBase
             int index = 1;
             bool cond = false;
             bool right = true;
-            while (index <= auditoriums.Dimension.End.Row)
+            while (index <= desks.Dimension.End.Row)
             {
-                string? codeName = auditoriums.Cells[$"A{index}"].Value?.ToString();
+                string? codeName = desks.Cells[$"A{index}"].Value?.ToString();
                 DateTime timeValue;
 
                 string? startTime;
-                ExcelRange startTime0 = auditoriums.Cells[$"B{index}"];
+                ExcelRange startTime0 = desks.Cells[$"B{index}"];
                 try
                 {
                     timeValue = DateTime.FromOADate(startTime0.GetValue<double>());
@@ -905,7 +873,7 @@ namespace InfoBase
 
 
                 string? endTime;
-                ExcelRange endTime0 = auditoriums.Cells[$"C{index}"];
+                ExcelRange endTime0 = desks.Cells[$"C{index}"];
                 try
                 {
                     timeValue = DateTime.FromOADate(endTime0.GetValue<double>());
@@ -917,18 +885,18 @@ namespace InfoBase
                     endTime = timeValue.ToString("H:mm");
 
                 }
-                string? capacity = auditoriums.Cells[$"D{index}"].Value?.ToString();
+                string? capacity = desks.Cells[$"D{index}"].Value?.ToString();
                 if (codeName == null || startTime == null || endTime == null || capacity == null)
                 {
                     if (codeName == null && startTime == null && endTime == null && capacity == null)
                     {
                         index++;
-                        auditoriums.Cells[$"A{index}"].Value = new_aud.tag;
-                        auditoriums.Cells.SetCellValue(index - 1, 1, Date("01.01.2000 " + new_aud.startTime));
-                        auditoriums.Cells[$"B{index}"].Style.Numberformat.Format = "H:mm";
-                        auditoriums.Cells.SetCellValue(index - 1, 2, Date("01.01.2000 " + new_aud.endTime));
-                        auditoriums.Cells[$"C{index}"].Style.Numberformat.Format = "H:mm";
-                        auditoriums.Cells[$"D{index}"].Value = new_aud.capacity;
+                        desks.Cells[$"A{index}"].Value = new_desk.id;
+                        desks.Cells.SetCellValue(index - 1, 1, Date("01.01.2000 " + new_desk.startTime));
+                        desks.Cells[$"B{index}"].Style.Numberformat.Format = "H:mm";
+                        desks.Cells.SetCellValue(index - 1, 2, Date("01.01.2000 " + new_desk.endTime));
+                        desks.Cells[$"C{index}"].Style.Numberformat.Format = "H:mm";
+                        desks.Cells[$"D{index}"].Value = new_desk.capacity;
                         cond = true;
                     }
                     else
@@ -941,12 +909,12 @@ namespace InfoBase
             }
             if (!cond)
             {
-                auditoriums.Cells[$"A{index}"].Value = new_aud.tag;
-                auditoriums.Cells.SetCellValue(index - 1, 1, Date("01.01.2000 " + new_aud.startTime));
-                auditoriums.Cells[$"B{index}"].Style.Numberformat.Format = "H:mm";
-                auditoriums.Cells.SetCellValue(index - 1, 2, Date("01.01.2000 " + new_aud.endTime));
-                auditoriums.Cells[$"C{index}"].Style.Numberformat.Format = "H:mm";
-                auditoriums.Cells[$"D{index}"].Value = new_aud.capacity;
+                desks.Cells[$"A{index}"].Value = new_desk.id;
+                desks.Cells.SetCellValue(index - 1, 1, Date("01.01.2000 " + new_desk.startTime));
+                desks.Cells[$"B{index}"].Style.Numberformat.Format = "H:mm";
+                desks.Cells.SetCellValue(index - 1, 2, Date("01.01.2000 " + new_desk.endTime));
+                desks.Cells[$"C{index}"].Style.Numberformat.Format = "H:mm";
+                desks.Cells[$"D{index}"].Value = new_desk.capacity;
             }
 
             if (right)
@@ -957,18 +925,21 @@ namespace InfoBase
             return right;
         }
 
+
         ////////////////////////////////////////////////////////////////////////////////////////
         ///////////////Базовые функции, не требующиеся в дальнейшем использовании///////////////
         public DataBase(string logfile_path, bool consoleLogging, string progname, string version)//конструктор 
         {
             log_counter = 0;
-            auditoriums = new();
+            this.version = version;
+            this.progname = progname;
+            desks = new();
             users = new();
             this.logfile_path = logfile_path;
             this.consoleLogging = consoleLogging;
-            this.version = version;
-            this.progname = progname;
         }
+        enum CardReadState { ReadCard, ReadCheck }
+
         public bool FillUsers(string pathToFileUsers)//первоначальное заполнение всех пользователей 
         {
             //открываем файл с данными 
@@ -982,7 +953,7 @@ namespace InfoBase
                 if (consoleLogging)
                 {
                     Console.WriteLine("Нажми кнопку для выхода");
-                    _ = Console.ReadKey();
+                    Console.ReadKey();
                 }
                 return false;
             }
@@ -991,16 +962,13 @@ namespace InfoBase
             bool cond = true;
             while (index <= users.Dimension.End.Row)
             {
-                string? user_login = users.Cells[$"A{index}"].Value?.ToString();
-                string? user_password = users.Cells[$"B{index}"].Value?.ToString();
-                string? user_access = users.Cells[$"C{index}"].Value?.ToString();
+                string? user_id = users.Cells[$"A{index}"].Value?.ToString();
+                string? user_login = users.Cells[$"B{index}"].Value?.ToString();
+                string? user_password = users.Cells[$"C{index}"].Value?.ToString();
                 string? user_name = users.Cells[$"D{index}"].Value?.ToString();
-                if (user_password == null || user_login == null || user_access == null || user_name == null)
+                if (user_login == null || user_id == null || user_password == null || user_name == null)
                 {
-                    if (user_password == null && user_login == null && user_access == null && user_name == null)
-                    {
-
-                    }
+                    if (user_login == null && user_id == null && user_password == null && user_name == null) { users.DeleteRow(index); }
                     else
                     {
                         LogState($"Строка данных пользователя {index} выглядит неполной или является пустой");
@@ -1009,32 +977,26 @@ namespace InfoBase
                 }
                 else
                 {
-                    this.users.Add(new(user_login, user_password, user_access, user_name, this));
+                    this.users.Add(new(user_id, user_login, user_password, user_name, this));
                     index++;
                 }
             }
             return cond;
-
         }
-        public bool FillData(string pathToFileData)//заполнение списка предметов и учителей 
+        public bool FillData(string pathToFileData)//заполнение списка досок с заданиями 
         {
             //открываем файл с данными 
             string fullPath = pathToFileData;
             data_path = fullPath;
             ExcelPackage excel = new(new FileInfo(fullPath));
-            bool cond3 = true;
+            bool right = true;
 
             //задаём списки 
-            ExcelWorksheet? auditoriums = excel.Workbook.Worksheets["Кабинеты"];
+            ExcelWorksheet? desks = excel.Workbook.Worksheets["Доски"];
 
-            if (auditoriums == null)
+            if (desks == null)
             {
-
-                if (auditoriums == null)
-                {
-                    LogState("Пересмотри вводимые тобой данные кабинетов");
-                }
-
+                LogState("Пересмотри вводимые тобой данные кабинетов");
                 if (consoleLogging)
                 {
                     Console.WriteLine("Нажми кнопку для выхода");
@@ -1044,165 +1006,204 @@ namespace InfoBase
             }
 
             int index = 1;
-            while (index <= auditoriums.Dimension.End.Row)
+            while (index <= desks.Dimension.End.Row)
             {
-                string? codeName = auditoriums.Cells[$"A{index}"].Value?.ToString();
-                DateTime timeValue;
+                string? desk_id = desks.Cells[$"A{index}"].Value?.ToString();
+                string? desk_name = desks.Cells[$"B{index}"].Value?.ToString();
+                string? desk_type = desks.Cells[$"C{index}"].Value?.ToString();
+                string? user_id = desks.Cells[$"D{index}"].Value?.ToString();
 
-                string? startTime;
-                ExcelRange startTime0 = auditoriums.Cells[$"B{index}"];
-                try
+                if (desk_id == null || desk_name == null || desk_type == null || user_id == null)
                 {
-                    timeValue = DateTime.FromOADate(startTime0.GetValue<double>());
-                    startTime = timeValue.ToString("H:mm");
-                }
-                catch (Exception)
-                {
-                    timeValue = Date(startTime0.GetValue<string>());
-                    startTime = timeValue.ToString("H:mm");
-
-                }
-
-
-                string? endTime;
-                ExcelRange endTime0 = auditoriums.Cells[$"C{index}"];
-                try
-                {
-                    timeValue = DateTime.FromOADate(endTime0.GetValue<double>());
-                    endTime = timeValue.ToString("H:mm");
-                }
-                catch (Exception)
-                {
-                    timeValue = Date(endTime0.GetValue<string>());
-                    endTime = timeValue.ToString("H:mm");
-
-                }
-
-                string? capacity = auditoriums.Cells[$"D{index}"].Value?.ToString();
-                if (codeName == null || startTime == null || endTime == null || capacity == null)
-                {
-                    if (codeName == null && startTime == null && endTime == null && capacity == null) { }
-                    if (codeName == null && capacity == null && auditoriums.Cells[$"B{index}"].Value?.ToString() == null
-                                                             && auditoriums.Cells[$"C{index}"].Value?.ToString() == null) { }
+                    if (desk_id == null && desk_name == null && desk_type == null && user_id == null) { desks.DeleteRow(index); }
+                    else if(desk_name.Contains('|'))
+                    {
+                        LogState($"Строка данных доски заданий номер {index} имеет недопустимый символ");
+                        right = false;
+                    }
                     else
                     {
-                        LogState($"Строка данных аудиторий {index} выглядит неполной или является пустой");
-                        cond3 = false;
+                        LogState($"Строка данных доски заданий номер {index} выглядит неполной");
+                        right = false;
                     }
                 }
                 else
                 {
-                    string? start = startTime.Split(":")[0] + ':' + startTime.Split(":")[1];
-                    string? end = endTime.Split(":")[0] + ':' + endTime.Split(":")[1];
-                    this.auditoriums.Add(new(codeName, start, end, int.Parse(capacity)));
+                    int type;
+                    if (GetUser(user_id) == null) right = false;
+                    else if (!int.TryParse(desk_type, out type)) right = false;
+                    else if (Desk.GetType(int.Parse(desk_type)) == Type.Error) right = false;
+                    else this.desks.Add(new(desk_name, GetUser(user_id), Desk.GetType(int.Parse(desk_type)), this));
                     index++;
                 }
             }
-
-            return cond3;
+            return right;
         }
         public bool FillDays(string pathToDirDays)//первоначальное заполнение всех броней 
         {
-            days_path = pathToDirDays;
-            string[] files = Directory.GetFiles(pathToDirDays, "*.day");
-            Note? temp_note = new();
-            Auditorium? temp_auitorium = new();
-
+            cards_path = pathToDirDays;
+            string[] files = Directory.GetFiles(pathToDirDays, "*.desk");
+            Card? temp_card = new(this, false);
+            Desk? temp_desk = new(this, false);
+            CardReadState state = CardReadState.ReadCard;
             bool result = true;
 
             foreach (string fileName in files)
             {
-                string date = System.IO.Path.GetFileName(fileName).Split(".day")[0];
+                string name = System.IO.Path.GetFileName(fileName).Split(".desk")[0];
                 using StreamReader reader = new(fileName);
                 if (reader.EndOfStream)
                 {
-                    LogState($"Файл \".../data/days/{date}\" пуст");
+                    LogState($"Файл \".../data/cards/{name}\" пуст");
+                    result = false;
                 }
+
                 else
                 {
                     string line;
                     bool cond = false;
-                    bool falseNote = true;
+                    bool falseCard = true;
+                    bool falseCheck = true;
+                    int rowNum = 1;
+
+                    string temp_cardID = String.Empty;
+
                     while ((line = reader.ReadLine()) != null)
                     {
                         string[]? parametrs = line.Split("|");
-                        if (parametrs.Length == 6)
+
+                        if (parametrs.Length == 4)
                         {
-                            foreach (Auditorium aud in auditoriums)
+                            string[] dta = data_path.Split("//");
+                            state = CardReadState.ReadCard;
+                            foreach (Desk desk in desks)
                             {
-                                if (line.Split("|")[5] == aud.tag)
+                                if (dta[^1] == desk.id)
                                 {
-                                    temp_note = new(line, date, this);
-                                    temp_auitorium = aud;
-                                    if (aud.AddNote(temp_note, this))
-                                    {
-                                        cond = true;
-                                        falseNote = false;
-                                    }
-                                    else
-                                    {
-                                        falseNote = true;
-                                    }
+                                    temp_card = new(parametrs[0], parametrs[1], Card.GetDone(parametrs[3]), parametrs[2], this);
+                                    temp_desk = desk;
+                                    desk.cards.Add(new(temp_card, this, false));
+                                    cond = true; falseCard = false;
                                     break;
                                 }
                             }
                         }
 
-                        else if (parametrs.Length == 2 && !falseNote)
+                        else if (parametrs.Length == 3 && state == CardReadState.ReadCard)
                         {
-                            User? temp_user = GetFullUser(parametrs[0], parametrs[1]);
-                            if (temp_auitorium == null || temp_note == null)
+                            temp_cardID = parametrs[1];
+                            if (parametrs[0] != "*")
                             {
-                                LogState($"Прочтение строки {line} безуспешно завершено. Проверьте информацию в файле {date + ".day"}");
+                                LogState($"Целостность строки {rowNum} нарушена, желательно перепроверить");
+                            }
+                            bool cond1 = false;
+                            state = CardReadState.ReadCheck;
+                            foreach (Desk desk in desks)
+                            {
+                                if (cond1) break;
+                                foreach(Card card in desk.cards)
+                                {
+                                    if (parametrs[1] == card.id)
+                                    {
+                                        temp_card = card;
+                                        temp_desk = desk;
+                                        card.checkList = new(parametrs[1], Check.GetDone(parametrs[2]));
+                                        cond = true; falseCard = false; cond1 = true;
+                                        break;
+                                    }
+                                }
+                            }
+                            falseCheck = cond1;
+                        }
+
+                        else if (parametrs.Length == 3 && state == CardReadState.ReadCheck)
+                        {
+                            state = CardReadState.ReadCard;
+                        }
+
+                        else if (parametrs.Length == 2 && !falseCard && state == CardReadState.ReadCard)
+                        {
+                            User? temp_user = GetUser(parametrs[1]);
+                            if (temp_desk == null || temp_card == null)
+                            {
+                                LogState($"Прочтение строки {line} безуспешно завершено. Проверьте информацию в файле {name + ".desk"} в строке {rowNum}");
                                 result = false;
                             }
                             else if (temp_user == null)
                             {
                                 string[] dta = data_path.Split("//");
-                                LogState($"Взятие пользователя по строке {line} безуспешно завершено. Проверьте информацию в файле {date + ".day"} и {dta[dta.Length - 1]}");
+                                LogState($"Взятие пользователя по строке {line} безуспешно завершено. Проверьте информацию в файле {name + ".desk"} в строке {rowNum} и файле {dta[^1]}");
+                                result = false;
+                            }
+                            else if (temp_desk.type == Type.Private)
+                            {
+                                string[] dta = data_path.Split("//");
+                                LogState($"Считывание строки номер {rowNum} с пользователем проигнорирована, т.к. доска определена как приватная");
+                                result = false;
+                            }
+                            else if (temp_desk.type == Type.Error)
+                            {
+                                string[] dta = data_path.Split("//");
+                                LogState($"Считывание файла с данными доски {temp_desk.id} невозможно, перепроверьте данные в {data_path.Split("//")[^1]}");
                                 result = false;
                             }
                             else
                             {
-                                auditoriums.Find(x => x == temp_auitorium).timetable.Find(x => x == temp_note).participators.Add(temp_user);
-                                users.Find(x => x == temp_user).participating.Add(temp_note);
-                                temp_user.participating.Add(temp_note);
+                                temp_desk.cards.Add(temp_card);
                             }
                         }
-                        else if (parametrs == null || parametrs.Length < 2 || falseNote) { }
+
+                        else if (parametrs.Length == 2 && !falseCard && state == CardReadState.ReadCheck && !falseCheck)
+                        {
+                            if (temp_desk == null || temp_card == null)
+                            {
+                                LogState($"Прочтение строки {line} безуспешно завершено. Проверьте информацию в файле {name + ".desk"} в строке {rowNum}");
+                                result = false;
+                            }
+                            else if (parametrs[0] == null || parametrs[1] == null)
+                            {
+                                string[] dta = data_path.Split("//");
+                                LogState($"Взятие пользователя по строке {line} безуспешно завершено. Проверьте информацию в файле {name + ".desk"} в строке {rowNum} и файле {dta[dta.Length - 1]}");
+                                result = false;
+                            }
+                            else
+                            {
+                                temp_card.checkList.tasks.Add(new(parametrs[0]) { done = Card.GetDone(parametrs[1])});
+                            }
+                        }
+                        else if (parametrs == null || falseCard || falseCheck) { }
                         else
                         {
                             LogState($"Неверный формат данных в строке {line}");
                             result = false;
                         }
+                        rowNum++;
                     }
-                    if (!cond)
-                    {
-                        result = false;
-                    }
+
+                    if (!cond) result = false;
                 }
             }
             return result;
         }
-
+        
         public bool CreateDataList(string fileName)//создание макета списка данных 
         {
             //создаем новый документ 
             ExcelPackage excel = new();
 
             //добавляем лист 
-            ExcelWorksheet worksheet3 = excel.Workbook.Worksheets.Add("Кабинеты");
+            ExcelWorksheet worksheet3 = excel.Workbook.Worksheets.Add("Доски");
 
             //добавляем данные 
 
-            worksheet3.Cells["A1"].Value = "Кодовый номер";
-            worksheet3.Column(1).Width = 15.5;
-            worksheet3.Cells["B1"].Value = "Начало бронирования";
-            worksheet3.Column(2).Width = 22;
-            worksheet3.Cells["C1"].Value = "Конец бронирования";
-            worksheet3.Column(3).Width = 22;
-            worksheet3.Cells["D1"].Value = "Вместимость";
-            worksheet3.Column(4).Width = 13;
+            worksheet3.Cells["A1"].Value = "Идентификатор";
+            worksheet3.Column(1).Width = 30;
+            worksheet3.Cells["B1"].Value = "Имя доски";
+            worksheet3.Column(2).Width = 30;
+            worksheet3.Cells["C1"].Value = "Тип доски";
+            worksheet3.Column(3).Width = 30;
+            worksheet3.Cells["D1"].Value = "Идентификатор создателя";
+            worksheet3.Column(4).Width = 30;
 
             //задаём путь 
             string fullPath = fileName;
@@ -1224,14 +1225,17 @@ namespace InfoBase
             ExcelWorksheet worksheet1 = excel.Workbook.Worksheets.Add("Данные");
 
             //добавляем данные 
-            worksheet1.Cells["A1"].Value = "Логин";
-            worksheet1.Column(1).Width = 35;
+            worksheet1.Cells["A1"].Value = "Идентификатор";
+            worksheet1.Column(1).Width = 30;
 
-            worksheet1.Cells["B1"].Value = "Пароль";
-            worksheet1.Column(2).Width = 35;
+            worksheet1.Cells["B1"].Value = "Логин";
+            worksheet1.Column(2).Width = 30;
 
-            worksheet1.Cells["C1"].Value = "Уровень доступа";
-            worksheet1.Column(3).Width = 75;
+            worksheet1.Cells["C1"].Value = "Пароль";
+            worksheet1.Column(3).Width = 30;
+
+            worksheet1.Cells["D1"].Value = "ОТображаемое имя";
+            worksheet1.Column(4).Width = 30;
 
             //задаём путь 
             string fullPath = fileName;
@@ -1242,17 +1246,6 @@ namespace InfoBase
             else
             {
                 return true;
-            }
-        }
-        public string? CreateDayList(string data)//создание макета списка дня 
-        {
-            //создаем новый документ 
-            string fullPath = days_path + data + ".day";
-
-            if (!File.Exists(fullPath)) { _ = File.Create(fullPath); return null; }
-            else
-            {
-                return fullPath;
             }
         }
     }
