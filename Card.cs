@@ -12,6 +12,7 @@ namespace InfoBase
         public string info; //дополнительная информация 
         public Check checkList; //"чек-лист" 
         public string id; //идентификатор задачи 
+        public string desk_id; //идентификатор привязанной доски 
         /*public DateTime deadline; //срок задачи*/
         public bool done; //состояние задачи 
 
@@ -53,9 +54,10 @@ namespace InfoBase
             id = IDCreator(db);
             this.done = done;
         }
-        public Card(string id, string name, bool done,  string info, DataBase db)//ручное создание (вкл. идентификатор) 
+        public Card(string id, string desk_id, string name, bool done,  string info, DataBase db)//ручное создание (вкл. идентификатор) 
         {
             this.name = name;
+            this.desk_id = desk_id;
             this.info = info;
             checkList = new();
             this.id = id;

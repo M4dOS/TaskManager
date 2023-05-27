@@ -15,7 +15,7 @@ namespace InfoBase
         public string logfile_path; //путь к папке с логами 
         public string data_path; //путь к таблице с данными 
         public string users_path; //путь к таблице с юзерами 
-        public string cards_path; //путь к папке с карточками 
+        public string desks_path; //путь к папке с карточками 
         private readonly bool consoleLogging;//делать логи в консоли или нет (выключить, если нужно будет работать с визуализацией) 
 
         public string version { get; }//версия программы 
@@ -29,7 +29,7 @@ namespace InfoBase
         {
             string[] datenums = date.Split(' ')[0].Split('.');
             string[] timenums = date.Split(' ')[1].Split(':');
-            string error = String.Empty;
+            string error = string.Empty;
             DateTime data;
             try
             {
@@ -48,7 +48,7 @@ namespace InfoBase
         public string? CreateDayList(string card_id)//создание макета списка дня 
         {
             //создаем новый документ 
-            string fullPath = cards_path + card_id + ".desk";
+            string fullPath = desks_path + card_id + ".desk";
 
             if (!File.Exists(fullPath)) { File.Create(fullPath); return null; }
             else
@@ -100,13 +100,18 @@ namespace InfoBase
                 }
             }
         }
+        int boolConvert(bool b)
+        {
+            if (b) return 1;
+            else return 0;
+        }
         public User RandLogPass(string name)//создание автоматически сгенерированного пользователя
         {
             // Создание генератора случайных чисел
             Random random = new Random();
 
             // Создание случайного логина
-            string login = "user" + user_ids.Count+1;
+            string login = "user" + user_ids.Count + 1;
 
             // Создание случайного пароля
             const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -150,9 +155,9 @@ namespace InfoBase
         }
         public Card? GetCard(string id)//найти карточку по идентификатору 
         {
-            foreach (var desk in desks)
+            foreach (Desk desk in desks)
             {
-                foreach (var card in desk.cards)
+                foreach (Card card in desk.cards)
                 {
                     if (card.id == id)
                     {
@@ -185,95 +190,538 @@ namespace InfoBase
         public bool MoveTask()///смещение позиции пункта в чек-листе 
         { return true; }
 
-        public bool SetCard(Card old_card, Card new_card)///сменить одну карточку на другую 
+        public bool SetCard(Card old_card, Card new_card)//сменить одну карточку на другую 
         {
-            Desk desk = GetDesk(old_card.desk.id);
-            if (desk.timetable.Remove(old_card))
+            Desk? desk = GetDesk(old_card.desk_id);
+            if (GetCard(old_card.id) == null || desk == null)
             {
-                _ = desk.AddCard(new_card, this);
-                string filePath;
+                LogState("Произошла непредвиденная ошибка поиска, дальнейшая смена карточки невозможна. Перепроверьте все вводимые данные");
+                return false;
+            }
+            else
+            {
+                if (desk.cards.Remove(GetCard(old_card.id)))
+                {
+                    desk.cards.Add(new_card);
+                    string filePath;
+                    try
+                    {
+                        filePath = desks_path + old_card.desk_id + ".desk"; //путь к файлу 
+                    }
+                    catch (Exception ex) { LogState($"Возникла следующая ошибка: {ex.Message}"); return false; }
 
+                    /*eoa71BFthJHwA6iY|задача 1|нужно что-то там сделать (зачемто)|0*/
+                    string searchLine = old_card.id + '|' + old_card.name + '|' + old_card.info + '|' + old_card.done;//строка, которую нужно заменить 
+                    searchLine += '\n' + '*' + '|' + old_card.id + '|' + boolConvert(old_card.checkList.done);
+                    foreach (TaskManager.Task task in old_card.checkList.tasks)
+                    {
+                        searchLine += '\n' + task.name + '|' + boolConvert(task.done);
+                    }
+                    searchLine += '\n' + '*' + '|' + old_card.id + '|' + boolConvert(old_card.checkList.done);
+
+                    string newLine = new_card.id + '|' + new_card.name + '|' + new_card.info + '|' + new_card.done; //новая строка, которой заменится найденная строка 
+                    newLine += '\n' + '*' + '|' + new_card.id + '|' + boolConvert(new_card.checkList.done);
+                    foreach (TaskManager.Task task in new_card.checkList.tasks)
+                    {
+                        newLine += '\n' + task.name + '|' + boolConvert(task.done);
+                    }
+                    newLine += '\n' + '*' + '|' + new_card.id + '|' + boolConvert(new_card.checkList.done);
+
+
+                    //открываем файл для чтения и записи 
+                    try
+                    {
+                        using StreamReader reader = new(filePath);
+                        //создаем временный файл для записи 
+                        string tempFilePath = System.IO.Path.GetTempFileName();
+
+                        //открываем временный файл для записи 
+                        using (StreamWriter writer = new(tempFilePath))
+                        {
+                            string line;
+                            string? temp_line = string.Empty;
+                            bool lineFound = false;
+                            bool sucess = false;
+
+                            // Читаем файл построчно
+                            while ((line = reader.ReadLine()) != null)
+                            {
+                                if (lineFound)
+                                {
+                                    writer.WriteLine(newLine);
+                                    lineFound = false;
+                                    sucess = true;
+                                }
+
+                                if (searchLine.Contains(line))
+                                {
+                                    lineFound = true;
+                                    while (!searchLine.Contains(line))
+                                    {
+                                        reader.ReadLine();
+                                    }
+
+                                }
+                                else
+                                {
+                                    writer.WriteLine(line);
+                                }
+                            }
+
+                            // Если строка не была найдена
+                            if (!sucess)
+                            {
+                                LogState($"Строка для замены \"{searchLine.Split('\n')[0]}\" не найдена");
+                                return false;
+                            }
+                        }
+
+                        // Закрываем файлы
+                        reader.Close();
+
+                        // Заменяем исходный файл временным файлом
+                        File.Delete(filePath);
+                        File.Move(tempFilePath, filePath);
+                    }
+                    catch (IOException ex)
+                    {
+                        LogState("Возникла следующая ошибка: " + ex.Message);
+                        return false;
+                    }
+
+                    return true;
+                }
+                else
+                {
+                    LogState("Не получилось изменить карточку (возможно, заменяемой вами записи не существует)");
+                    return false;
+                }
+            }
+
+        }
+        public bool SetUser(User old_user, User new_user)//сменить одного пользователя на другого 
+        {
+            string fullPath = users_path;
+            ExcelPackage excel = new(new FileInfo(fullPath));
+            ExcelWorksheet? users = excel.Workbook.Worksheets["Данные"];
+
+            if (users == null)
+            {
+                LogState("Пересмотри данные пользователей");
+                return false;
+            }
+
+            int indexToIns = -1;
+            if (this.users.FindIndex(x => x.id == old_user.id) != -1)
+            {
+                indexToIns = this.users.FindIndex(x => x.id == old_user.id);
+            }
+            else
+            {
+                LogState("Не получилось изменить запись (возможно, заменяемого вами пользователя не существует)");
+                return false;
+            }
+
+            if (this.users.Remove(GetUser(old_user.id)))
+            {
+                this.users.Insert(indexToIns, new_user);
+                int index = 1;
+                bool cond = true;
+                while (index <= users.Dimension.End.Row)
+                {
+                    string? user_id = users.Cells[$"A{index}"].Value?.ToString();
+                    string? user_login = users.Cells[$"B{index}"].Value?.ToString();
+                    string? user_pass = users.Cells[$"C{index}"].Value?.ToString();
+                    string? user_name = users.Cells[$"D{index}"].Value?.ToString();
+                    if (user_login == null || user_id == null || user_pass == null || user_name == null)
+                    {
+                        if (user_login == null && user_id == null && user_pass == null && user_name == null) { users.DeleteRow(index); }
+                        else
+                        {
+                            LogState($"Строка данных пользователей {index} выглядит неполной или является пустой");
+                            cond = false;
+                        }
+
+                    }
+                    else if (user_id == old_user.id)
+                    {
+                        users.Cells.SetCellValue(index - 1, 0, new_user.id);
+                        users.Cells.SetCellValue(index - 1, 1, new_user.login);
+                        users.Cells.SetCellValue(index - 1, 2, new_user.password);
+                        users.Cells.SetCellValue(index - 1, 3, new_user.name);
+                        break;
+                    }
+                    index++;
+                }
+
+                if (cond)
+                {
+                    FileInfo excelFile = new(fullPath);
+                    excel.SaveAs(excelFile);
+                }
+                return cond;
+
+            }
+            else
+            {
+                LogState("Не получилось изменить карточку (возможно, заменяемого вами пользователя не существует)");
+                return false;
+            }
+        }
+        public bool SetDesk(Desk old_desk, Desk new_desk)//сменить одну доску на другую 
+        {
+            //открываем файл с данными 
+            string fullPath = data_path;
+            ExcelPackage excel = new(new FileInfo(fullPath));
+
+            //задаём списки 
+            ExcelWorksheet? desks = excel.Workbook.Worksheets["Доски"];
+
+            if (desks == null)
+            {
+                LogState($"Пересмотри вводимые тобой данные досок в файле {data_path.Split("\\")[^1]}");
+                return false;
+            }
+
+            int indexToIns = -1;
+            if (this.desks.FindIndex(x => x.id == old_desk.id) != -1)
+            {
+                indexToIns = this.desks.FindIndex(x => x.id == old_desk.id);
+            }
+            else
+            {
+                LogState("Не получилось изменить запись (возможно, заменяемой вами аудитории не существует)");
+                return false;
+            }
+
+
+            bool cond = true;
+            if (this.desks.Remove(GetDesk(old_desk.id)))
+            {
+                this.desks.Insert(indexToIns, new_desk);
+                int index = 1;
+                while (index <= desks.Dimension.End.Row)
+                {
+                    string? desk_id = desks.Cells[$"A{index}"].Value?.ToString();
+                    string? desk_name = desks.Cells[$"B{index}"].Value?.ToString();
+                    string? desk_type = desks.Cells[$"C{index}"].Value?.ToString();
+                    string? user_id = desks.Cells[$"D{index}"].Value?.ToString();
+                    if (desk_id == null || desk_name == null || desk_type == null || user_id == null)
+                    {
+                        if (desk_id == null && desk_name == null && desk_type == null && user_id == null) { desks.DeleteRow(index); }
+                        else
+                        {
+                            cond = false;
+                            LogState($"Строка данных пользователя {index} выглядит неполной");
+                        }
+                    }
+
+                    else if (old_desk.id == desk_id)
+                    {
+                        desks.Cells.SetCellValue(index - 1, 0, new_desk.id);
+                        desks.Cells.SetCellValue(index - 1, 1, new_desk.name);
+                        desks.Cells.SetCellValue(index - 1, 2, (int)new_desk.type);
+                        desks.Cells.SetCellValue(index - 1, 3, new_desk.owner.id);
+                        break;
+                    }
+                    index++;
+                }
+            }
+            else
+            {
+                LogState("Не получилось изменить запись (возможно, заменяемой вами аудитории не существует)");
+                return false;
+            }
+
+            if (cond)
+            {
+                FileInfo excelFile = new(fullPath);
+                excel.SaveAs(excelFile);
+            }
+            return cond;
+        }
+
+        public bool DeleteCard(Card delete_card)//удалить карточку 
+        {
+            Desk? desk = GetDesk(delete_card.desk_id);
+            if (GetCard(delete_card.id) == null || desk == null)
+            {
+                LogState("Произошла непредвиденная ошибка поиска, дальнейшее удаление карточки невозможно. Перепроверьте все вводимые данные");
+                return false;
+            }
+            else
+            {
+                if (desk.cards.Remove(GetCard(delete_card.id)))
+                {
+                    /*desk.cards.Add(new_card);*/
+                    string filePath;
+                    try
+                    {
+                        filePath = desks_path + delete_card.desk_id + ".desk"; //путь к файлу 
+                    }
+                    catch (Exception ex) { LogState($"Возникла следующая ошибка: {ex.Message}"); return false; }
+
+                    /*eoa71BFthJHwA6iY|задача 1|нужно что-то там сделать (зачемто)|0*/
+                    string searchLine = delete_card.id + '|' + delete_card.name + '|' + delete_card.info + '|' + delete_card.done;//строка, которую нужно заменить 
+                    searchLine += '\n' + '*' + '|' + delete_card.id + '|' + boolConvert(delete_card.checkList.done);
+                    foreach (TaskManager.Task task in delete_card.checkList.tasks)
+                    {
+                        searchLine += '\n' + task.name + '|' + boolConvert(task.done);
+                    }
+                    searchLine += '\n' + '*' + '|' + delete_card.id + '|' + boolConvert(delete_card.checkList.done);
+
+                    /*string newLine = new_card.id + '|' + new_card.name + '|' + new_card.info + '|' + new_card.done; //новая строка, которой заменится найденная строка 
+                    newLine += '\n' + '*' + '|' + new_card.id + '|' + boolConvert(new_card.checkList.done);
+                    foreach (var task in new_card.checkList.tasks)
+                    {
+                        newLine += '\n' + task.name + '|' + boolConvert(task.done);
+                    }
+                    newLine += '\n' + '*' + '|' + new_card.id + '|' + boolConvert(new_card.checkList.done);*/
+
+
+                    //открываем файл для чтения и записи 
+                    try
+                    {
+                        using StreamReader reader = new(filePath);
+                        //создаем временный файл для записи 
+                        string tempFilePath = System.IO.Path.GetTempFileName();
+
+                        //открываем временный файл для записи 
+                        using (StreamWriter writer = new(tempFilePath))
+                        {
+                            string line;
+                            string? temp_line = string.Empty;
+                            bool lineFound = false;
+                            bool sucess = false;
+
+                            // Читаем файл построчно
+                            while ((line = reader.ReadLine()) != null)
+                            {
+                                if (lineFound)
+                                {
+                                    /*writer.WriteLine(newLine);*/
+                                    lineFound = false;
+                                    sucess = true;
+                                }
+
+                                if (searchLine.Contains(line))
+                                {
+                                    lineFound = true;
+                                    while (!searchLine.Contains(line))
+                                    {
+                                        reader.ReadLine();
+                                    }
+
+                                }
+                                else
+                                {
+                                    writer.WriteLine(line);
+                                }
+                            }
+
+                            // Если строка не была найдена
+                            if (!sucess)
+                            {
+                                LogState($"Строка для удаления \"{searchLine.Split('\n')[0]}\" не найдена");
+                                return false;
+                            }
+                        }
+
+                        // Закрываем файлы
+                        reader.Close();
+
+                        // Заменяем исходный файл временным файлом
+                        File.Delete(filePath);
+                        File.Move(tempFilePath, filePath);
+                    }
+                    catch (IOException ex)
+                    {
+                        LogState("Возникла следующая ошибка: " + ex.Message);
+                        return false;
+                    }
+
+                    return true;
+                }
+                else
+                {
+                    LogState("Не получилось удалить карточку (возможно, заменяемой вами записи не существует)");
+                    return false;
+                }
+            }
+        }
+        public bool DeleteUser(User delete_user)//удалить пользователя 
+        {
+
+            string fullPath = users_path;
+            ExcelPackage excel = new(new FileInfo(fullPath));
+            ExcelWorksheet? users = excel.Workbook.Worksheets["Данные"];
+
+            if (users == null)
+            {
+                LogState("Пересмотри данные пользователей");
+                return false;
+            }
+
+            int indexToIns = -1;
+            if (this.users.FindIndex(x => x.id == delete_user.id) != -1)
+            {
+                indexToIns = this.users.FindIndex(x => x.id == delete_user.id);
+            }
+            else
+            {
+                LogState("Не получилось изменить запись (возможно, заменяемого вами пользователя не существует)");
+                return false;
+            }
+
+            if (this.users.Remove(GetUser(delete_user.id)))
+            {
+                /*this.users.Insert(indexToIns, new_user);*/
+                int index = 1;
+                bool cond = true;
+                while (index <= users.Dimension.End.Row)
+                {
+                    string? user_id = users.Cells[$"A{index}"].Value?.ToString();
+                    string? user_login = users.Cells[$"B{index}"].Value?.ToString();
+                    string? user_pass = users.Cells[$"C{index}"].Value?.ToString();
+                    string? user_name = users.Cells[$"D{index}"].Value?.ToString();
+                    if (user_login == null || user_id == null || user_pass == null || user_name == null)
+                    {
+                        if (user_login == null && user_id == null && user_pass == null && user_name == null) { users.DeleteRow(index); }
+                        else
+                        {
+                            LogState($"Строка данных пользователей {index} выглядит неполной или является пустой");
+                            cond = false;
+                        }
+
+                    }
+                    else if (user_id == delete_user.id) { users.DeleteRow(index); }
+                    index++;
+                }
+
+                if (cond)
+                {
+                    FileInfo excelFile = new(fullPath);
+                    excel.SaveAs(excelFile);
+                }
+                return cond;
+
+            }
+            else
+            {
+                LogState("Не получилось изменить карточку (возможно, заменяемого вами пользователя не существует)");
+                return false;
+            }
+        }
+        public bool DeleteDesk(Desk delete_desk)//удалить доску 
+        {
+            //открываем файл с данными 
+            string fullPath = data_path;
+            ExcelPackage excel = new(new FileInfo(fullPath));
+
+            //задаём списки 
+            ExcelWorksheet? desks = excel.Workbook.Worksheets["Доски"];
+
+            if (desks == null)
+            {
+                LogState($"Пересмотри вводимые тобой данные досок в файле {data_path.Split("\\")[^1]}");
+                return false;
+            }
+
+            int indexToIns = -1;
+            if (this.desks.FindIndex(x => x.id == delete_desk.id) != -1)
+            {
+                indexToIns = this.desks.FindIndex(x => x.id == delete_desk.id);
+            }
+            else
+            {
+                LogState("Не получилось изменить запись (возможно, заменяемой вами аудитории не существует)");
+                return false;
+            }
+
+
+            bool cond = true;
+            if (this.desks.Remove(GetDesk(delete_desk.id)))
+            {
+                /*this.desks.Insert(indexToIns, new_desk);*/
+                int index = 1;
+                while (index <= desks.Dimension.End.Row)
+                {
+                    string? desk_id = desks.Cells[$"A{index}"].Value?.ToString();
+                    string? desk_name = desks.Cells[$"B{index}"].Value?.ToString();
+                    string? desk_type = desks.Cells[$"C{index}"].Value?.ToString();
+                    string? user_id = desks.Cells[$"D{index}"].Value?.ToString();
+                    if (desk_id == null || desk_name == null || desk_type == null || user_id == null)
+                    {
+                        if (desk_id == null && desk_name == null && desk_type == null && user_id == null) { desks.DeleteRow(index); }
+                        else
+                        {
+                            cond = false;
+                            LogState($"Строка данных пользователя {index} выглядит неполной");
+                        }
+                    }
+
+                    else if (delete_desk.id == desk_id) { desks.DeleteRow(index); }
+                    index++;
+                }
+            }
+            else
+            {
+                LogState("Не получилось изменить запись (возможно, заменяемой вами аудитории не существует)");
+                return false;
+            }
+
+            if (cond)
+            {
+                FileInfo excelFile = new(fullPath);
+                excel.SaveAs(excelFile);
+            }
+            return cond;
+
+        }
+
+        public bool AddCard(Card new_card)//добавить карточку 
+        {
+            Desk? desk = GetDesk(new_card.desk_id);
+            if (desk == null)
+            {
+                LogState("Произошла непредвиденная ошибка поиска, дальнейшая смена карточки невозможна. Перепроверьте все вводимые данные");
+                return false;
+            }
+            else
+            {
+                desk.cards.Add(new_card);
+                string filePath;
                 try
                 {
-                    filePath = cards_path + old_card.startTime.ToString("yyyy.MM.dd") + ".desk"; // путь к файлу
+                    filePath = desks_path + new_card.desk_id + ".desk"; //путь к файлу 
                 }
-                catch (Exception ex) { LogState($"Возникла следующая ошибка: {ex}"); return false; }
+                catch (Exception ex) { LogState($"Возникла следующая ошибка: {ex.Message}"); return false; }
 
-                /*Название предмета 1 | 9:00 | 10:00 | Преподаватель 1 | Доп описание для Название предмета 1 1 | a1*/
-                string searchLine = old_card.name + '|' + old_card.startTime.ToString("H:mm") + '|' + old_card.endTime.ToString("H:mm") + '|'
-                                    + old_card.teacher.name + '|' + old_card.subname + '|' + old_card.desk.id;// строка, которую нужно заменить
-                string newLine = new_card.name + '|' + new_card.startTime.ToString("H:mm") + '|' + new_card.endTime.ToString("H:mm") + '|'
-                                 + new_card.teacher.name + '|' + new_card.subname + '|' + new_card.desk.id; // новая строка, которой заменится найденная строка
+                /*eoa71BFthJHwA6iY|задача 1|нужно что-то там сделать (зачемто)|0*/
 
-                // Открываем файл для чтения и записи
+                string newLine = new_card.id + '|' + new_card.name + '|' + new_card.info + '|' + new_card.done; //новая строка, которой заменится найденная строка 
+                newLine += '\n' + '*' + '|' + new_card.id + '|' + boolConvert(new_card.checkList.done);
+                foreach (TaskManager.Task task in new_card.checkList.tasks)
+                {
+                    newLine += '\n' + task.name + '|' + boolConvert(task.done);
+                }
+                newLine += '\n' + '*' + '|' + new_card.id + '|' + boolConvert(new_card.checkList.done);
+
+
+                //открываем файл для чтения и записи 
                 try
                 {
                     using StreamReader reader = new(filePath);
-                    // Создаем временный файл для записи
+                    //создаем временный файл для записи 
                     string tempFilePath = System.IO.Path.GetTempFileName();
 
-                    // Открываем временный файл для записи
+                    //открываем временный файл для записи 
                     using (StreamWriter writer = new(tempFilePath))
                     {
                         string line;
-                        string? temp_line = string.Empty;
-                        bool lineFound = false;
-                        bool sucess = false;
-
                         // Читаем файл построчно
-                        while ((line = reader.ReadLine()) != null)
-                        {
-                            if (lineFound)
-                            {
-                                if (temp_line != string.Empty)
-                                {
-                                    writer.WriteLine(temp_line);
-                                }
-
-                                lineFound = false;
-                                sucess = true;
-                            }
-
-                            if (line.Contains(searchLine))
-                            {
-                                writer.WriteLine(newLine);
-                                lineFound = true;
-                                foreach (User user in new_card.participators)
-                                {
-                                    writer.WriteLine($"{user.login}|{user.name}");
-                                }
-                                while ((line = reader.ReadLine()) != null)
-                                {
-                                    if (line.Split('|').Length > 2)
-                                    {
-                                        temp_line = line;
-                                        break;
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                writer.WriteLine(line);
-                            }
-                        }
-
-                        if (lineFound)
-                        {
-                            if (temp_line != string.Empty)
-                            {
-                                writer.WriteLine(temp_line);
-                            }
-
-                            lineFound = false;
-
-                        }
-
-                        // Если строка не была найдена
-                        if (!sucess)
-                        {
-                            LogState($"Строка для замены \"{searchLine}\" не найдена");
-                            return false;
-                        }
+                        while ((line = reader.ReadLine()) != null) writer.WriteLine(line);
+                        foreach (string str in newLine.Split('\n')) writer.WriteLine(str);
                     }
 
                     // Закрываем файлы
@@ -291,496 +739,13 @@ namespace InfoBase
 
                 return true;
             }
-            else
-            {
-                LogState("Не получилось изменить запись (возможно, заменяемой вами записи не существует)");
-                return false;
-            }
         }
-        public bool SetUser(User old_user, User new_user)///сменить одного пользователя на другого 
+        public bool AddUser(User new_user)//добавить пользователя 
         {
             string fullPath = users_path;
             ExcelPackage excel = new(new FileInfo(fullPath));
             ExcelWorksheet? users = excel.Workbook.Worksheets["Данные"];
 
-            if (users == null)
-            {
-                LogState("Пересмотри данные пользователей");
-                return false;
-            }
-
-            int indexToIns = -1;
-            if (this.users.FindIndex(x => x == old_user) != -1)
-            {
-                indexToIns = this.users.FindIndex(x => x == old_user);
-            }
-            else
-            {
-                LogState("Не получилось изменить запись (возможно, заменяемого вами пользователя не существует)");
-                return false;
-            }
-
-            if (this.users.Remove(old_user))
-            {
-                this.users.Insert(indexToIns, new_user);
-                int index = 1;
-                bool cond = true;
-                while (index <= users.Dimension.End.Row)
-                {
-                    string? user_login = users.Cells[$"A{index}"].Value?.ToString();
-                    string? user_password = users.Cells[$"B{index}"].Value?.ToString();
-                    string? user_access = users.Cells[$"C{index}"].Value?.ToString();
-                    string? user_name = users.Cells[$"D{index}"].Value?.ToString();
-                    if (user_password == null || user_login == null || user_access == null || user_name == null)
-                    {
-                        if (user_password == null && user_login == null && user_access == null && user_name == null)
-                        {
-
-                        }
-                        else
-                        {
-                            LogState($"Строка данных аудиторий {index} выглядит неполной или является пустой");
-                            cond = false;
-                        }
-
-                    }
-                    else if (user_password == old_user.password || user_login == old_user.login
-                            || user_access == old_user.access.ToString().ToLower() || user_name == old_user.name)
-                    {
-                        users.Cells.SetCellValue(index - 1, 0, new_user.login);
-                        users.Cells.SetCellValue(index - 1, 1, new_user.password);
-                        users.Cells.SetCellValue(index - 1, 2, new_user.access.ToString().ToLower());
-                        users.Cells.SetCellValue(index - 1, 3, new_user.name);
-                        break;
-                    }
-                    index++;
-                }
-
-                if (cond)
-                {
-                    FileInfo excelFile = new(fullPath);
-                    excel.SaveAs(excelFile);
-                }
-                return cond;
-
-            }
-            else
-            {
-                LogState("Не получилось изменить запись (возможно, заменяемого вами пользователя не существует)");
-                return false;
-            }
-        }
-        public bool SetDesk(Desk old_desk, Desk new_desk)///сменить одну доску на другую 
-        {
-            //открываем файл с данными 
-            string fullPath = data_path;
-            ExcelPackage excel = new(new FileInfo(fullPath));
-
-            //задаём списки 
-            ExcelWorksheet? desks = excel.Workbook.Worksheets["Доски"];
-
-            if (desks == null)
-            {
-                LogState("Пересмотри вводимые тобой данные кабинетов");
-                if (consoleLogging)
-                {
-                    Console.WriteLine("Нажми кнопку для выхода");
-                    _ = Console.ReadKey();
-                }
-                return false;
-            }
-
-            int indexToIns = -1;
-            if (this.desks.FindIndex(x => x == old_desk) != -1)
-            {
-                indexToIns = this.desks.FindIndex(x => x == old_desk);
-            }
-            else
-            {
-                LogState("Не получилось изменить запись (возможно, заменяемой вами аудитории не существует)");
-                return false;
-            }
-
-
-            bool cond = true;
-            if (this.desks.Remove(old_desk))
-            {
-                this.desks.Insert(indexToIns, new_desk);
-                int index = 1;
-                while (index <= desks.Dimension.End.Row)
-                {
-                    string? codeName = desks.Cells[$"A{index}"].Value?.ToString();
-                    string? startTime = desks.Cells[$"B{index}"].Value?.ToString().Split(' ')[1];
-                    string? endTime = desks.Cells[$"C{index}"].Value?.ToString().Split(' ')[1];
-                    string? capacity = desks.Cells[$"D{index}"].Value?.ToString();
-                    if (codeName == null || startTime == null || endTime == null || capacity == null)
-                    {
-                        if (codeName == null && startTime == null && endTime == null && capacity == null)
-                        {
-                        }
-                        else
-                        {
-                            cond = false;
-                            LogState($"Строка данных пользователя {index} выглядит неполной");
-                        }
-                    }
-                    else if (old_desk.id == codeName && old_desk.startTime + ":00" == startTime && old_desk.endTime + ":00" == endTime
-                            && old_desk.capacity == int.Parse(capacity))
-                    {
-                        desks.Cells.SetCellValue(index - 1, 0, new_desk.id);
-                        desks.Cells["B1"].Value = Date("01.01.2000 " + new_desk.startTime);
-                        desks.Cells["B1"].Style.Numberformat.Format = "H:mm";
-                        desks.Cells["C1"].Value = Date("01.01.2000 " + new_desk.endTime);
-                        desks.Cells["C1"].Style.Numberformat.Format = "H:mm";
-                        desks.Cells.SetCellValue(index - 1, 3, new_desk.capacity);
-                        break;
-                    }
-                    index++;
-                }
-            }
-            else
-            {
-                LogState("Не получилось изменить запись (возможно, заменяемой вами аудитории не существует)");
-                return false;
-            }
-
-            if (cond)
-            {
-                FileInfo excelFile = new(fullPath);
-                excel.SaveAs(excelFile);
-            }
-            return cond;
-        }
-
-        public bool DeleteCard(Card delete_card)///удалить карточку 
-        {
-            Desk desk = delete_card.desk;
-            if (desk.timetable.Remove(delete_card))
-            {
-                string filePath;
-
-                try
-                {
-                    filePath = cards_path + delete_card.startTime.ToString("yyyy.MM.dd") + ".desk"; // путь к файлу
-                }
-                catch (Exception ex) { LogState($"Ошибка: {ex}"); return false; }
-                bool sucess = false;
-
-                /*Название предмета 1 | 9:00 | 10:00 | Преподаватель 1 | Доп описание для Название предмета 1 1 | a1*/
-                string searchLine = delete_card.name + '|' + delete_card.startTime.ToString("H:mm") + '|' + delete_card.endTime.ToString("H:mm") + '|'
-                                    + delete_card.teacher.name + '|' + delete_card.subname + '|' + delete_card.desk.id;// строка, которую нужно заменить
-
-                // Открываем файл для чтения и записи
-                try
-                {
-
-                    using StreamReader reader = new(filePath);
-                    // Создаем временный файл для записи
-                    string tempFilePath = System.IO.Path.GetTempFileName();
-
-                    // Открываем временный файл для записи
-                    using (StreamWriter writer = new(tempFilePath))
-                    {
-                        string line;
-                        string? temp_line = string.Empty;
-                        bool lineFound = false;
-
-
-                        // Читаем файл построчно
-                        while ((line = reader.ReadLine()) != null)
-                        {
-                            if (lineFound)
-                            {
-                                if (temp_line != string.Empty)
-                                {
-                                    writer.WriteLine(temp_line);
-                                }
-
-                                lineFound = false;
-
-                            }
-
-                            if (line.Contains(searchLine))
-                            {
-                                lineFound = true;
-                                sucess = true;
-                                while ((line = reader.ReadLine()) != null)
-                                {
-                                    if (line.Split('|').Length > 2)
-                                    {
-                                        temp_line = line;
-                                        break;
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                writer.WriteLine(line);
-                            }
-                        }
-
-                        if (lineFound)
-                        {
-                            if (temp_line != string.Empty)
-                            {
-                                writer.WriteLine(temp_line);
-                            }
-
-                            lineFound = false;
-
-                        }
-
-                        // Если строка не была найдена
-                        if (!sucess)
-                        {
-                            LogState($"Строка для замены \"{searchLine}\" не найдена");
-                            sucess = false;
-                        }
-                    }
-
-                    if (sucess)
-                    {
-                        // Закрываем файлы
-                        reader.Close();
-
-                        // Заменяем исходный файл временным файлом
-                        File.Delete(filePath);
-                        File.Move(tempFilePath, filePath);
-                        sucess = true;
-                    }
-
-                }
-                catch (IOException ex)
-                {
-                    LogState("Возникла следующая ошибка: " + ex.Message);
-                    sucess = false;
-                }
-                return sucess;
-            }
-            else
-            {
-                LogState("Не получилось изменить запись (возможно, заменяемой вами записи не существует)");
-                return false;
-            }
-        }
-        public bool DeleteUser(User delete_user)///удалить пользователя 
-        {
-            string fullPath = users_path;
-            ExcelPackage excel = new(new FileInfo(fullPath));
-            ExcelWorksheet? users = excel.Workbook.Worksheets["Данные"];
-            if (users == null)
-            {
-                LogState("Пересмотри данные пользователей");
-                return false;
-            }
-
-            if (this.users.Contains(delete_user))
-            {
-                int index = 1;
-                bool cond = true;
-                while (index <= users.Dimension.End.Row)
-                {
-                    string? user_login = users.Cells[$"A{index}"].Value?.ToString();
-                    string? user_password = users.Cells[$"B{index}"].Value?.ToString();
-                    string? user_access = users.Cells[$"C{index}"].Value?.ToString();
-                    string? user_name = users.Cells[$"D{index}"].Value?.ToString();
-                    if (user_password == null || user_login == null || user_access == null || user_name == null)
-                    {
-                        if (user_password == null && user_login == null && user_access == null && user_name == null)
-                        {
-
-                        }
-                        else
-                        {
-                            LogState($"Строка данных пользователя {index} выглядит неполной");
-                            cond = false;
-                        }
-                    }
-                    else if (user_password == delete_user.password && user_login == delete_user.login
-                            && user_access == delete_user.access.ToString().ToLower() && user_name == delete_user.name)
-                    {
-                        users.DeleteRow(index);
-                        break;
-                    }
-                    else
-                    {
-                        index++;
-                    }
-                }
-
-                if (cond)
-                {
-                    FileInfo excelFile = new(fullPath);
-                    excel.SaveAs(excelFile);
-                    /*if (delete_user.access == Access.Teacher)
-                    {
-                        DeleteTeacher(delete_user.name);
-                    }
-                    else
-                    {*/
-                    foreach (Desk desk in desks)
-                    {
-                        for (int i = 0; i < desk.timetable.Count; i++)
-                        {
-                            if (desk.timetable[i].participators.Contains(delete_user))
-                            {
-                                Card card0 = new(desk.timetable[i]);
-                                card0.participators.Remove(delete_user);
-                                SetCard(desk.timetable[i], card0);
-                                this.users.Remove(delete_user);
-                                i--;
-                            }
-
-                        }
-                    }
-                    /*}*/
-                }
-
-                return cond;
-            }
-
-            else
-            {
-                LogState("Не получилось изменить запись (возможно, заменяемого вами пользователя не существует)");
-                return false;
-            }
-        }
-        public bool DeleteDesk(Desk delete_desk)///удалить доску 
-        {
-            //открываем файл с данными 
-            string fullPath = data_path;
-            ExcelPackage excel = new(new FileInfo(fullPath));
-
-            //задаём списки 
-            ExcelWorksheet? desks = excel.Workbook.Worksheets["Доски"];
-
-            if (desks == null)
-            {
-                LogState("Пересмотри вводимые тобой данные кабинетов");
-                if (consoleLogging)
-                {
-                    Console.WriteLine("Нажми кнопку для выхода");
-                    _ = Console.ReadKey();
-                }
-                return false;
-            }
-
-            bool cond = true;
-            if (GetDesk(delete_desk.id) != null)
-            {
-                int index = 1;
-                while (index <= desks.Dimension.End.Row)
-                {
-                    string? codeName = desks.Cells[$"A{index}"].Value?.ToString();
-                    DateTime timeValue;
-
-                    string? startTime;
-                    ExcelRange startTime0 = desks.Cells[$"B{index}"];
-                    try
-                    {
-                        timeValue = DateTime.FromOADate(startTime0.GetValue<double>());
-                        startTime = timeValue.ToString("H:mm");
-                    }
-                    catch (Exception)
-                    {
-                        timeValue = Date(startTime0.GetValue<string>());
-                        startTime = timeValue.ToString("H:mm");
-
-                    }
-
-
-                    string? endTime;
-                    ExcelRange endTime0 = desks.Cells[$"C{index}"];
-                    try
-                    {
-                        timeValue = DateTime.FromOADate(endTime0.GetValue<double>());
-                        endTime = timeValue.ToString("H:mm");
-                    }
-                    catch (Exception)
-                    {
-                        timeValue = Date(endTime0.GetValue<string>());
-                        endTime = timeValue.ToString("H:mm");
-
-                    }
-                    string? capacity = desks.Cells[$"D{index}"].Value?.ToString();
-
-
-                    if (codeName == null || startTime == null || endTime == null || capacity == null)
-                    {
-                        if (codeName == null && startTime == null && endTime == null && capacity == null)
-                        {
-                        }
-                        else
-                        {
-                            LogState($"Строка данных аудитории {index} выглядит неполной");
-                            cond = false;
-                        }
-                    }
-                    else if (delete_desk.id == codeName && delete_desk.startTime == startTime && delete_desk.endTime == endTime
-                            && delete_desk.capacity == int.Parse(capacity))
-                    {
-                        desks.DeleteRow(index);
-                        break;
-                    }
-                    else
-                    {
-                        index++;
-                    }
-                }
-            }
-            else
-            {
-                LogState("Не получилось изменить запись (возможно, заменяемой вами аудитории не существует)");
-                return false;
-            }
-
-            if (cond)
-            {
-                FileInfo excelFile = new(fullPath);
-                excel.SaveAs(excelFile);
-                delete_desk = GetDesk(delete_desk.id);
-                for (int i = 0; i < this.desks.Count; i++)
-                {
-                    if (delete_desk == this.desks[i])
-                    {
-                        for (int j = 0; j < this.desks[i].timetable.Count; j++)
-                        {
-                            Card card = this.desks[i].timetable[j];
-                            if (card.desk.id == delete_desk.id)
-                            {
-                                DeleteCard(card);
-                            }
-                        }
-                        this.desks.RemoveAt(i);
-                    }
-                }
-            }
-
-            return cond;
-        }
-
-        public bool AddCard(Card new_card)///добавить карточку 
-        {
-            Desk desk = GetDesk(new_card.desk.id);
-            if (desk.AddCard(new_card, this))
-            {
-                using StreamWriter writer = new(CreateDayList(new_card.startTime.ToString("yyyy.MM.dd")), true);
-                string newLine = new_card.name + '|' + new_card.startTime.ToString("H:mm") + '|' + new_card.endTime.ToString("H:mm") + '|'
-                        + new_card.teacher.name + '|' + new_card.subname + '|' + new_card.desk.id; // новая строка, которой заменится найденная строка
-                writer.WriteLine(newLine);
-                return true;
-            }
-            else
-            {
-                LogState($"Добавление записи \"{new_card.name}\" безуспешно завершено");
-                return false;
-            }
-        }
-        public bool AddUser(User new_user)///добавить пользователя 
-        {
-            string fullPath = users_path;
-            ExcelPackage excel = new(new FileInfo(fullPath));
-            ExcelWorksheet? users = excel.Workbook.Worksheets["Данные"];
             if (users == null)
             {
                 LogState("Пересмотри данные пользователей");
@@ -788,46 +753,37 @@ namespace InfoBase
             }
 
             int index = 1;
-            bool cond = false;
-            bool right = true;
+            bool cond = true;
             while (index <= users.Dimension.End.Row)
             {
-                string? user_login = users.Cells[$"A{index}"].Value?.ToString();
-                string? user_password = users.Cells[$"B{index}"].Value?.ToString();
-                string? user_access = users.Cells[$"C{index}"].Value?.ToString();
+                string? user_id = users.Cells[$"A{index}"].Value?.ToString();
+                string? user_login = users.Cells[$"B{index}"].Value?.ToString();
+                string? user_pass = users.Cells[$"C{index}"].Value?.ToString();
                 string? user_name = users.Cells[$"D{index}"].Value?.ToString();
-                if (user_password == null || user_login == null || user_access == null || user_name == null)
+                if (user_login == null || user_id == null || user_pass == null || user_name == null)
                 {
-                    if (user_password == null && user_login == null && user_access == null && user_name == null)
-                    {
-                        users.Cells.SetCellValue(index - 1, 0, new_user.login);
-                        users.Cells.SetCellValue(index - 1, 1, new_user.password);
-                        users.Cells.SetCellValue(index - 1, 2, new_user.access.ToString().ToLower());
-                        users.Cells.SetCellValue(index - 1, 3, new_user.name);
-                        cond = true;
-                    }
+                    if (user_login == null && user_id == null && user_pass == null && user_name == null) { users.DeleteRow(index); }
                     else
                     {
-                        LogState($"Строка данных пользователя {index} выглядит неполной или является пустой");
-                        right = false;
+                        LogState($"Строка данных пользователей {index} выглядит неполной или является пустой");
+                        cond = false;
                     }
+
                 }
                 index++;
             }
-            if (!cond)
-            {
-                users.Cells.SetCellValue(index - 1, 0, new_user.login);
-                users.Cells.SetCellValue(index - 1, 1, new_user.password);
-                users.Cells.SetCellValue(index - 1, 2, new_user.access.ToString().ToLower());
-                users.Cells.SetCellValue(index - 1, 3, new_user.name);
-            }
+            users.Cells.SetCellValue(index - 1, 0, new_user.id);
+            users.Cells.SetCellValue(index - 1, 1, new_user.login);
+            users.Cells.SetCellValue(index - 1, 2, new_user.password);
+            users.Cells.SetCellValue(index - 1, 3, new_user.name);
 
-            if (right)
+            if (cond)
             {
                 FileInfo excelFile = new(fullPath);
                 excel.SaveAs(excelFile);
             }
-            return right;
+            return cond;
+
         }
         public bool AddDesk(Desk new_desk)///добавить доску 
         {
@@ -840,89 +796,130 @@ namespace InfoBase
 
             if (desks == null)
             {
-                LogState("Пересмотри вводимые тобой данные кабинетов");
-                if (consoleLogging)
-                {
-                    Console.WriteLine("Нажми кнопку для выхода");
-                    _ = Console.ReadKey();
-                }
+                LogState($"Пересмотри вводимые тобой данные досок в файле {data_path.Split("\\")[^1]}");
                 return false;
             }
 
+            bool cond = true;
             int index = 1;
-            bool cond = false;
-            bool right = true;
             while (index <= desks.Dimension.End.Row)
             {
-                string? codeName = desks.Cells[$"A{index}"].Value?.ToString();
-                DateTime timeValue;
-
-                string? startTime;
-                ExcelRange startTime0 = desks.Cells[$"B{index}"];
-                try
+                string? desk_id = desks.Cells[$"A{index}"].Value?.ToString();
+                string? desk_name = desks.Cells[$"B{index}"].Value?.ToString();
+                string? desk_type = desks.Cells[$"C{index}"].Value?.ToString();
+                string? user_id = desks.Cells[$"D{index}"].Value?.ToString();
+                if (desk_id == null || desk_name == null || desk_type == null || user_id == null)
                 {
-                    timeValue = DateTime.FromOADate(startTime0.GetValue<double>());
-                    startTime = timeValue.ToString("H:mm");
-                }
-                catch (Exception)
-                {
-                    timeValue = Date(startTime0.GetValue<string>());
-                    startTime = timeValue.ToString("H:mm");
-
-                }
-
-
-                string? endTime;
-                ExcelRange endTime0 = desks.Cells[$"C{index}"];
-                try
-                {
-                    timeValue = DateTime.FromOADate(endTime0.GetValue<double>());
-                    endTime = timeValue.ToString("H:mm");
-                }
-                catch (Exception)
-                {
-                    timeValue = Date(endTime0.GetValue<string>());
-                    endTime = timeValue.ToString("H:mm");
-
-                }
-                string? capacity = desks.Cells[$"D{index}"].Value?.ToString();
-                if (codeName == null || startTime == null || endTime == null || capacity == null)
-                {
-                    if (codeName == null && startTime == null && endTime == null && capacity == null)
-                    {
-                        index++;
-                        desks.Cells[$"A{index}"].Value = new_desk.id;
-                        desks.Cells.SetCellValue(index - 1, 1, Date("01.01.2000 " + new_desk.startTime));
-                        desks.Cells[$"B{index}"].Style.Numberformat.Format = "H:mm";
-                        desks.Cells.SetCellValue(index - 1, 2, Date("01.01.2000 " + new_desk.endTime));
-                        desks.Cells[$"C{index}"].Style.Numberformat.Format = "H:mm";
-                        desks.Cells[$"D{index}"].Value = new_desk.capacity;
-                        cond = true;
-                    }
+                    if (desk_id == null && desk_name == null && desk_type == null && user_id == null) { desks.DeleteRow(index); }
                     else
                     {
-                        LogState($"Строка данных аудитории {index} выглядит неполной");
-                        right = false;
+                        cond = false;
+                        LogState($"Строка данных пользователя {index} выглядит неполной");
                     }
                 }
                 index++;
             }
-            if (!cond)
-            {
-                desks.Cells[$"A{index}"].Value = new_desk.id;
-                desks.Cells.SetCellValue(index - 1, 1, Date("01.01.2000 " + new_desk.startTime));
-                desks.Cells[$"B{index}"].Style.Numberformat.Format = "H:mm";
-                desks.Cells.SetCellValue(index - 1, 2, Date("01.01.2000 " + new_desk.endTime));
-                desks.Cells[$"C{index}"].Style.Numberformat.Format = "H:mm";
-                desks.Cells[$"D{index}"].Value = new_desk.capacity;
-            }
+            desks.Cells.SetCellValue(index - 1, 0, new_desk.id);
+            desks.Cells.SetCellValue(index - 1, 1, new_desk.name);
+            desks.Cells.SetCellValue(index - 1, 2, (int)new_desk.type);
+            desks.Cells.SetCellValue(index - 1, 3, new_desk.owner.id);
 
-            if (right)
+
+            if (cond)
             {
                 FileInfo excelFile = new(fullPath);
                 excel.SaveAs(excelFile);
             }
-            return right;
+            return cond;
+
+            /* //открываем файл с данными 
+             string fullPath = data_path;
+             string fullPath_todir = desks_path;
+             ExcelPackage excel = new(new FileInfo(fullPath));
+
+             //задаём списки 
+             ExcelWorksheet? desks = excel.Workbook.Worksheets["Доски"];
+
+             if (desks == null)
+             {
+                 LogState("Пересмотри вводимые тобой данные досок");
+                 return false;
+             }
+
+             int index = 1;
+             bool cond = false;
+             bool right = true;
+             while (index <= desks.Dimension.End.Row)
+             {
+                 string? codeName = desks.Cells[$"A{index}"].Value?.ToString();
+                 DateTime timeValue;
+
+                 string? startTime;
+                 ExcelRange startTime0 = desks.Cells[$"B{index}"];
+                 try
+                 {
+                     timeValue = DateTime.FromOADate(startTime0.GetValue<double>());
+                     startTime = timeValue.ToString("H:mm");
+                 }
+                 catch (Exception)
+                 {
+                     timeValue = Date(startTime0.GetValue<string>());
+                     startTime = timeValue.ToString("H:mm");
+
+                 }
+
+
+                 string? endTime;
+                 ExcelRange endTime0 = desks.Cells[$"C{index}"];
+                 try
+                 {
+                     timeValue = DateTime.FromOADate(endTime0.GetValue<double>());
+                     endTime = timeValue.ToString("H:mm");
+                 }
+                 catch (Exception)
+                 {
+                     timeValue = Date(endTime0.GetValue<string>());
+                     endTime = timeValue.ToString("H:mm");
+
+                 }
+                 string? capacity = desks.Cells[$"D{index}"].Value?.ToString();
+                 if (codeName == null || startTime == null || endTime == null || capacity == null)
+                 {
+                     if (codeName == null && startTime == null && endTime == null && capacity == null)
+                     {
+                         index++;
+                         desks.Cells[$"A{index}"].Value = new_desk.id;
+                         desks.Cells.SetCellValue(index - 1, 1, Date("01.01.2000 " + new_desk.startTime));
+                         desks.Cells[$"B{index}"].Style.Numberformat.Format = "H:mm";
+                         desks.Cells.SetCellValue(index - 1, 2, Date("01.01.2000 " + new_desk.endTime));
+                         desks.Cells[$"C{index}"].Style.Numberformat.Format = "H:mm";
+                         desks.Cells[$"D{index}"].Value = new_desk.capacity;
+                         cond = true;
+                     }
+                     else
+                     {
+                         LogState($"Строка данных аудитории {index} выглядит неполной");
+                         right = false;
+                     }
+                 }
+                 index++;
+             }
+             if (!cond)
+             {
+                 desks.Cells[$"A{index}"].Value = new_desk.id;
+                 desks.Cells.SetCellValue(index - 1, 1, Date("01.01.2000 " + new_desk.startTime));
+                 desks.Cells[$"B{index}"].Style.Numberformat.Format = "H:mm";
+                 desks.Cells.SetCellValue(index - 1, 2, Date("01.01.2000 " + new_desk.endTime));
+                 desks.Cells[$"C{index}"].Style.Numberformat.Format = "H:mm";
+                 desks.Cells[$"D{index}"].Value = new_desk.capacity;
+             }
+
+             if (right)
+             {
+                 FileInfo excelFile = new(fullPath);
+                 excel.SaveAs(excelFile);
+             }
+             return right;*/
         }
 
 
@@ -935,6 +932,9 @@ namespace InfoBase
             this.progname = progname;
             desks = new();
             users = new();
+            user_ids = new();
+            card_ids = new();
+            desk_ids = new();
             this.logfile_path = logfile_path;
             this.consoleLogging = consoleLogging;
         }
@@ -950,11 +950,6 @@ namespace InfoBase
             if (users == null)
             {
                 LogState("Пересмотри вводимые тобой данные пользователей");
-                if (consoleLogging)
-                {
-                    Console.WriteLine("Нажми кнопку для выхода");
-                    Console.ReadKey();
-                }
                 return false;
             }
 
@@ -997,11 +992,6 @@ namespace InfoBase
             if (desks == null)
             {
                 LogState("Пересмотри вводимые тобой данные кабинетов");
-                if (consoleLogging)
-                {
-                    Console.WriteLine("Нажми кнопку для выхода");
-                    Console.ReadKey();
-                }
                 return false;
             }
 
@@ -1016,7 +1006,7 @@ namespace InfoBase
                 if (desk_id == null || desk_name == null || desk_type == null || user_id == null)
                 {
                     if (desk_id == null && desk_name == null && desk_type == null && user_id == null) { desks.DeleteRow(index); }
-                    else if(desk_name.Contains('|'))
+                    else if (desk_name.Contains('|'))
                     {
                         LogState($"Строка данных доски заданий номер {index} имеет недопустимый символ");
                         right = false;
@@ -1039,9 +1029,9 @@ namespace InfoBase
             }
             return right;
         }
-        public bool FillDays(string pathToDirDays)//первоначальное заполнение всех броней 
+        public bool FillDesks(string pathToDirDays)//первоначальное заполнение всех броней 
         {
-            cards_path = pathToDirDays;
+            desks_path = pathToDirDays;
             string[] files = Directory.GetFiles(pathToDirDays, "*.desk");
             Card? temp_card = new(this, false);
             Desk? temp_desk = new(this, false);
@@ -1054,7 +1044,7 @@ namespace InfoBase
                 using StreamReader reader = new(fileName);
                 if (reader.EndOfStream)
                 {
-                    LogState($"Файл \".../data/cards/{name}\" пуст");
+                    LogState($"Файл \"...\\{pathToDirDays.Split("\\")[^2]}\\{name}.desk\" пуст");
                     result = false;
                 }
 
@@ -1066,7 +1056,7 @@ namespace InfoBase
                     bool falseCheck = true;
                     int rowNum = 1;
 
-                    string temp_cardID = String.Empty;
+                    string temp_cardID = string.Empty;
 
                     while ((line = reader.ReadLine()) != null)
                     {
@@ -1080,7 +1070,7 @@ namespace InfoBase
                             {
                                 if (dta[^1] == desk.id)
                                 {
-                                    temp_card = new(parametrs[0], parametrs[1], Card.GetDone(parametrs[3]), parametrs[2], this);
+                                    temp_card = new(parametrs[0], name, parametrs[1], Card.GetDone(parametrs[3]), parametrs[2], this);
                                     temp_desk = desk;
                                     desk.cards.Add(new(temp_card, this, false));
                                     cond = true; falseCard = false;
@@ -1101,7 +1091,7 @@ namespace InfoBase
                             foreach (Desk desk in desks)
                             {
                                 if (cond1) break;
-                                foreach(Card card in desk.cards)
+                                foreach (Card card in desk.cards)
                                 {
                                     if (parametrs[1] == card.id)
                                     {
@@ -1149,7 +1139,21 @@ namespace InfoBase
                             }
                             else
                             {
-                                temp_desk.cards.Add(temp_card);
+                                switch (parametrs[0])
+                                {
+                                    case "0":
+                                        temp_user.guest.Add(temp_desk.id);
+                                        break;
+                                    case "1":
+                                        temp_user.admin.Add(temp_desk.id);
+                                        break;
+                                    case "2":
+                                        temp_user.owner.Add(temp_desk.id);
+                                        break;
+                                    default:
+                                        LogState($"Неправильный вид доступа пользователя в строке. Проверьте информацию в файле \"{name}.desk\" в строке {rowNum}");
+                                        break;
+                                }
                             }
                         }
 
@@ -1168,7 +1172,7 @@ namespace InfoBase
                             }
                             else
                             {
-                                temp_card.checkList.tasks.Add(new(parametrs[0]) { done = Card.GetDone(parametrs[1])});
+                                temp_card.checkList.tasks.Add(new(parametrs[0]) { done = Card.GetDone(parametrs[1]) });
                             }
                         }
                         else if (parametrs == null || falseCard || falseCheck) { }
@@ -1185,7 +1189,7 @@ namespace InfoBase
             }
             return result;
         }
-        
+
         public bool CreateDataList(string fileName)//создание макета списка данных 
         {
             //создаем новый документ 

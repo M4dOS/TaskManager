@@ -8,9 +8,9 @@ namespace InfoBase
         public string id; //идентификатор пользователя 
         public string password; //пароль 
         public string name; //имя 
-        public List<Desk> owner; //доски, которыми он владеет 
-        public List<Desk> admin; //доски, с которыми можно взаимодействовать 
-        public List<Desk> guest; //доски, которые можно только смотреть 
+        public List<string> owner; //доски, которыми он владеет 
+        public List<string> admin; //доски, с которыми можно взаимодействовать 
+        public List<string> guest; //доски, которые можно только смотреть 
 
         public string IDCreator(DataBase db)//создание идентификатора
         {

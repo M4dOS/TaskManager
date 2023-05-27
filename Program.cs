@@ -5,6 +5,7 @@ namespace InfoBase
 {
     internal class Program
     {
+        [STAThread]
         private static void Main(string[] args)
         {
             //задаём кодировку
@@ -12,7 +13,7 @@ namespace InfoBase
 
             //задаём неизменные параметры
             const bool isDebug = true;//переключатель между режимом дебага и обычным режимом (логирование работает в обоих случаях) 
-            const string version = "v0.1.2149 alpha";//строка версии (смотри правила оформления ниже) 
+            const string version = "v0.2.1159 alpha";//строка версии (смотри правила оформления ниже) 
             const string progname = "Task Manager";
 
             /*///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -69,7 +70,7 @@ namespace InfoBase
                     db.LogState($"Возникла ошибка, проверьте лог {DateTime.Now:yyyy-MM-dd}.log");
                 }
             }
-            else if (!db.FillDays(daysDir))
+            else if (!db.FillDesks(daysDir))
             {
                 db.LogState("Проблема с данными расписания или ошибка FillDays()");
                 if (isDebug)
@@ -96,6 +97,8 @@ namespace InfoBase
             else
             {
                 db.LogState($"Начало работы программы. Имя программы: {db.progname}. Текущая версия программы: {db.version}");//просто нужно 
+                ApplicationConfiguration.Initialize();
+                Application.Run(new Form1());
                 while (true)
                 {
                     
