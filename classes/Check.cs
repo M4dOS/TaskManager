@@ -1,6 +1,6 @@
 ﻿namespace TaskManager
 {
-    internal class Check
+    public class Check
     {
         public string id_card; //привязка к карточке 
         public List<Task> tasks; //"пункты" чек-листа 
@@ -25,7 +25,7 @@
         {
             done = check.done;
             tasks = check.tasks.ToList();
-            if (check.id_card.Clone() as string != null) id_card = check.id_card.Clone() as string;
+            if ((check.id_card.Clone() as string) != null) id_card = check.id_card.Clone() as string;
             else id_card = string.Empty;
         }
         public Check()//пустышка 

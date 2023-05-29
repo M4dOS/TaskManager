@@ -1,8 +1,8 @@
 ﻿using System.Text;
 
-namespace InfoBase
+namespace TaskManager
 {
-    internal class User
+    public class User
     {
         public string login; //логин 
         public string id; //идентификатор пользователя 
@@ -55,17 +55,17 @@ namespace InfoBase
         }
         public User(User user, DataBase db, bool unic_id)//клонирование
         {
-            if (user.login.Clone() as string != null) login = user.login.Clone() as string;
+            if ((user.login.Clone() as string) != null) login = user.login.Clone() as string;
             else login = string.Empty;
-            if (user.password.Clone() as string != null) password = user.password.Clone() as string;
+            if ((user.password.Clone() as string) != null) password = user.password.Clone() as string;
             else password = string.Empty;
-            if (user.name.Clone() as string != null) name = user.name.Clone() as string;
+            if ((user.name.Clone() as string) != null) name = user.name.Clone() as string;
             else name = string.Empty;
             if (unic_id) id = IDCreator(db);
             else id = user.id;
-            this.owner = user.owner.ToList();
-            this.admin = user.admin.ToList();
-            this.guest = user.guest.ToList();
+            owner = user.owner.ToList();
+            admin = user.admin.ToList();
+            guest = user.guest.ToList();
         }
         public User(DataBase db, bool id_need)//пустышка
         {

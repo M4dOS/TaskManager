@@ -1,6 +1,6 @@
 ﻿namespace TaskManager
 {
-    internal class Task
+    public class Task
     {
         public string name; //имя пункта 
         public bool done; //состояние 
@@ -22,7 +22,7 @@
         public Task(Task task)//клонирование 
         {
             done = task.done;
-            if(task.name.Clone() as string != null) name = task.name.Clone() as string;
+            if ((task.name.Clone() as string) != null) name = task.name.Clone() as string;
             else name = string.Empty;
         }
         public Task()//пустышка 

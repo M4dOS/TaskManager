@@ -1,10 +1,8 @@
-﻿using System.Security.Policy;
-using System.Text;
-using TaskManager;
+﻿using System.Text;
 
-namespace InfoBase
+namespace TaskManager
 {
-    internal class Card
+    public class Card
     {
         /*public List<string> pic_paths; //для ссылок на фотки (под сомнением) */
 
@@ -54,7 +52,7 @@ namespace InfoBase
             id = IDCreator(db);
             this.done = done;
         }
-        public Card(string id, string desk_id, string name, bool done,  string info, DataBase db)//ручное создание (вкл. идентификатор) 
+        public Card(string id, string desk_id, string name, bool done, string info, DataBase db)//ручное создание (вкл. идентификатор) 
         {
             this.name = name;
             this.desk_id = desk_id;
@@ -66,12 +64,12 @@ namespace InfoBase
         }
         public Card(Card card, DataBase db, bool unic_id)//клонирование 
         {
-            if(card.name.Clone() as string != null) name = card.name.Clone() as string;
+            if ((card.name.Clone() as string) != null) name = card.name.Clone() as string;
             else name = string.Empty;
-            if(card.info.Clone() as string != null) info = card.info.Clone() as string;
+            if ((card.info.Clone() as string) != null) info = card.info.Clone() as string;
             else info = string.Empty;
             /*this.checkList = card.checkList;*/
-            if(unic_id) id = IDCreator(db);
+            if (unic_id) id = IDCreator(db);
             else id = card.id;
             done = false;
         }

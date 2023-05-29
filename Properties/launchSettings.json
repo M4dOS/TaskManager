@@ -1,6 +1,6 @@
 {
   "profiles": {
-    "InfoBase": {
+    "TaskManager": {
       "commandName": "Project",
       "workingDirectory": "$(ProjectDir)",
       "remoteDebugEnabled": false

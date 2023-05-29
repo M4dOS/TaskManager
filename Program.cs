@@ -1,7 +1,7 @@
 ﻿using OfficeOpenXml;
 using System.Text;
 
-namespace InfoBase
+namespace TaskManager
 {
     internal class Program
     {
@@ -13,8 +13,8 @@ namespace InfoBase
 
             //задаём неизменные параметры
             const bool isDebug = true;//переключатель между режимом дебага и обычным режимом (логирование работает в обоих случаях) 
-            const string version = "v0.2.1159 alpha";//строка версии (смотри правила оформления ниже) 
-            const string progname = "Task Manager";
+            const string version = "v0.3.1557 alpha";//строка версии (смотри правила оформления ниже) 
+            const string progname = "Task Manager";//строка названия программы (не менять без согласия) 
 
             /*///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
             Оформлять строку version в соответствии с правилом:
@@ -34,76 +34,58 @@ namespace InfoBase
             //настройка для EPPlus 
             ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 
-            /*const string info = progname + " " + version;*/
-
             //константы для файлов 
             string workDir = Directory.GetCurrentDirectory() + @"\data\";
             string daysDir = workDir + @"desks\";
             string logsDir = workDir + @"logs\";
 
-            //подготовка датабазы 
-            DataBase db = new(logsDir, isDebug, progname, version);
-            if (!File.Exists(workDir + "Data.xlsx"))
-            {
-                db.CreateDataList(workDir + "Data.xlsx");
-            }
 
-            if (!File.Exists(workDir + "Users.xlsx"))
-            {
-                db.CreateUserList(workDir + "Users.xlsx");
-            }
+            //подготовка датабазы 
+            ApplicationConfiguration.Initialize();
+            TaskM program = new(isDebug, new(logsDir, isDebug, new(), progname, version), args);
+            DataBase db = program.dataBase;
+            if (!File.Exists(workDir + "Data.xlsx")) db.CreateDataList(workDir + "Data.xlsx");
+            if (!File.Exists(workDir + "Users.xlsx"))db.CreateUserList(workDir + "Users.xlsx");
+            
 
             //заполнение данных и проверка на подлинность (непустоту) 
+            bool cond1 = true; bool cond2 = true; bool cond3 = true;
             if (!db.FillUsers(workDir + "Users.xlsx"))
             {
+                cond1 = false;
                 db.LogState("Проблема со списком пользователей или ошибка FillUsers()");
-                if (isDebug)
-                {
-                    db.LogState($"Возникла ошибка, проверьте лог {DateTime.Now:yyyy-MM-dd}.log");
-                }
             }
-            else if (!db.FillData(workDir + "Data.xlsx"))
+            if (!db.FillData(workDir + "Data.xlsx"))
             {
+                cond2 = false;
                 db.LogState("Проблема с базовыми данными или ошибка FillData()");
-                if (isDebug)
-                {
-                    db.LogState($"Возникла ошибка, проверьте лог {DateTime.Now:yyyy-MM-dd}.log");
-                }
             }
-            else if (!db.FillDesks(daysDir))
+            if (!db.FillDesks(daysDir))
             {
-                db.LogState("Проблема с данными расписания или ошибка FillDays()");
-                if (isDebug)
-                {
-                    db.LogState($"Возникла ошибка, проверьте лог {DateTime.Now:yyyy-MM-dd}.log");
-                }
+                cond3 = false;
+                db.LogState("Проблема с данными расписания или ошибка FillDesks()");
             }
+            if (cond1 && cond2 && cond3) db.LogState($"Конец обработки информации, начало работы программы. Имя программы: \"{db.progname}\". Текущая версия программы: \"{db.version}\"");//просто нужно 
+            else db.LogState($"Возникла проблемы при обработке информации, проверьте лог \"{DateTime.Now:yyyy-MM-dd}.log\"");
+            
+            //запуск программы и переход к внутренним методам
+            Application.Run(program);
+
             /////////////////////////////////////////код выше трогать запрещено//////////////////////////////////////////////////////
             /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
             /*///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-            1) Работа программы (писать свой код ТОЛЬКО внутри while(true){ } или внутри классов и функций в них
+   ВАЖНО!!! 1) Писать свой код ТОЛЬКО в функции Main(), находящейся в TaskM.cs, так как она отвечает за дальнейшую обработку программы
             2) Всё что выше трогать категорически запрещено для правильной работы программы
             3) Переключатель деббагера isDebug (по надобности) и строку версии version (в соответствии с правилами) можно изменять 
             4) Обязательным условием является использование LogState(string message) вместо Console.Write
-            5) Старайтесь как можно меньше умещать код в while(true){ }
+            5) Для разработки формы использовать только TaskM.cs и все ему прилежащие файлы
             6) Работать с Database.Date(string date) с осторожностью:
             - Первым делом она пробует формат "dd.MM.yyyy hh:mm"
             - При неудаче форматирует как "yyyy.MM.dd hh:mm"
             - В остальных случаях может выдать ошибку с последующим выходом из программы
             ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
-
-            else
-            {
-                db.LogState($"Начало работы программы. Имя программы: {db.progname}. Текущая версия программы: {db.version}");//просто нужно 
-                ApplicationConfiguration.Initialize();
-                Application.Run(new Form1());
-                while (true)
-                {
-                    
-                }
-            }
         }
     }
 }

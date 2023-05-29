@@ -1,9 +1,9 @@
 ﻿using System.Text;
 
-namespace InfoBase
+namespace TaskManager
 {
-    internal enum Type { Error = -1 ,Private, Public }
-    internal class Desk
+    public enum Type { Error = -1, Private, Public }
+    public class Desk
     {
         public string name; //название доски 
         public string id; //идентификатор доски 
@@ -61,13 +61,13 @@ namespace InfoBase
         }
         public Desk(Desk desk, DataBase db, bool unic_id)//клонирование 
         {
-            if(desk.name.Clone() as string != null) name = desk.name.Clone() as string;
+            if ((desk.name.Clone() as string) != null) name = desk.name.Clone() as string;
             else name = string.Empty;
             /*owner = desk.owner;*/
             if (unic_id) id = IDCreator(db);
             else id = desk.id;
             type = desk.type;
-            this.cards = desk.cards.ToList();
+            cards = desk.cards.ToList();
         }
         public Desk(DataBase db, bool id_need)//пустышка 
         {

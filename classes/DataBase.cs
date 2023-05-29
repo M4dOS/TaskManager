@@ -1,9 +1,8 @@
 ﻿using OfficeOpenXml;
-using TaskManager;
 
-namespace InfoBase
+namespace TaskManager
 {
-    internal class DataBase
+    public class DataBase
     {
         public List<Desk> desks;//доски с заданиями 
         public List<User> users;//пользователи 
@@ -15,12 +14,14 @@ namespace InfoBase
         public string logfile_path; //путь к папке с логами 
         public string data_path; //путь к таблице с данными 
         public string users_path; //путь к таблице с юзерами 
-        public string desks_path; //путь к папке с карточками 
+        public string desks_path; //путь к папке с досками 
         private readonly bool consoleLogging;//делать логи в консоли или нет (выключить, если нужно будет работать с визуализацией) 
 
+        public Logger logState; //форма для логирования программы 
+        private int log_counter; //для LogState
         public string version { get; }//версия программы 
         public string progname { get; }//имя программы 
-        private int log_counter; //для LogState
+
         ////////////////////Переменные, необходимые для работы всей датабазы////////////////////
         ////////////////////////////////////////////////////////////////////////////////////////
 
@@ -84,20 +85,14 @@ namespace InfoBase
 
                 if (consoleLogging)
                 {
-                    Console.WriteLine('\n' + line + " ЛОГ ЗАПУСКА " + DateTime.Now.ToString("HH:mm:ss.fff") + " " + line + '\n');
+                    /*logState.LogWindow.AppendText(line + " ЛОГ ЗАПУСКА " + DateTime.Now.ToString("HH:mm:ss.fff") + " " + line + '\n');*/
                 }
             }
             writer.Write(DateTime.Now.ToString("HH:mm:ss.fff") + " : " + message + '\n');
             if (consoleLogging)
             {
-                if (message.Contains('\n'))
-                {
-                    Console.Write(DateTime.Now.ToString("HH:mm:ss.fff") + " : " + message);
-                }
-                else
-                {
-                    Console.Write(DateTime.Now.ToString("HH:mm:ss.fff") + " : " + message + '\n');
-                }
+                /*if (message.Contains('\n')) logState.LogWindow.AppendText(DateTime.Now.ToString("HH:mm:ss.fff") + " : " + message);
+                else logState.LogWindow.AppendText(DateTime.Now.ToString("HH:mm:ss.fff") + " : " + message + '\n');*/
             }
         }
         int boolConvert(bool b)
@@ -117,7 +112,7 @@ namespace InfoBase
             const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
             string password = new string(Enumerable.Repeat(chars, 8).Select(s => s[random.Next(s.Length)]).ToArray());
 
-            LogState($"Успешно зарезервирован в памяти пользователь: {login}|{password}");
+            LogState($"Успешно зарезервирован в памяти пользователь с следующими данными (логин|пароль) : {login}|{password}");
             return new(login, password, name, this);
         }
 
@@ -135,7 +130,7 @@ namespace InfoBase
             }
             if (!cond)
             {
-                LogState($"Пользователя с идентификатором {id} нету в базе данных");
+                LogState($"Пользователя с идентификатором \"{id}\" нету в базе данных");
             }
             return null;
         }
@@ -148,7 +143,7 @@ namespace InfoBase
             }
             if (!cond)
             {
-                LogState($"Пользователя с именем {name} и логином {login} нету в базе данных");
+                LogState($"Пользователя с именем \"{name}\" и логином \"{login}\" нету в базе данных");
             }
 
             return null;
@@ -165,7 +160,7 @@ namespace InfoBase
                     }
                 }
             }
-            LogState($"Не найдено задания с идентификатором {id}");
+            LogState($"Не найдено задания с идентификатором \"{id}\"");
             return null;
         }
         public Desk? GetDesk(string id)//найти доску по идентификатору 
@@ -177,7 +172,7 @@ namespace InfoBase
                     return desk;
                 }
             }
-            LogState($"Аудитория с номером {id} не найдена");
+            LogState($"Аудитория с номером \"{id}\" не найдена");
             return null;
         }
 
@@ -338,7 +333,7 @@ namespace InfoBase
                         if (user_login == null && user_id == null && user_pass == null && user_name == null) { users.DeleteRow(index); }
                         else
                         {
-                            LogState($"Строка данных пользователей {index} выглядит неполной или является пустой");
+                            LogState($"Строка данных пользователей \"{index}\" выглядит неполной или является пустой");
                             cond = false;
                         }
 
@@ -379,7 +374,7 @@ namespace InfoBase
 
             if (desks == null)
             {
-                LogState($"Пересмотри вводимые тобой данные досок в файле {data_path.Split("\\")[^1]}");
+                LogState($"Пересмотри вводимые тобой данные досок в файле \"{data_path.Split("\\")[^1]}\"");
                 return false;
             }
 
@@ -412,7 +407,7 @@ namespace InfoBase
                         else
                         {
                             cond = false;
-                            LogState($"Строка данных пользователя {index} выглядит неполной");
+                            LogState($"Строка данных пользователя \"{index}\" выглядит неполной");
                         }
                     }
 
@@ -589,7 +584,7 @@ namespace InfoBase
                         if (user_login == null && user_id == null && user_pass == null && user_name == null) { users.DeleteRow(index); }
                         else
                         {
-                            LogState($"Строка данных пользователей {index} выглядит неполной или является пустой");
+                            LogState($"Строка данных пользователей \"{index}\" выглядит неполной или является пустой");
                             cond = false;
                         }
 
@@ -623,7 +618,7 @@ namespace InfoBase
 
             if (desks == null)
             {
-                LogState($"Пересмотри вводимые тобой данные досок в файле {data_path.Split("\\")[^1]}");
+                LogState($"Пересмотри вводимые тобой данные досок в файле \"{data_path.Split("\\")[^1]}\"");
                 return false;
             }
 
@@ -656,7 +651,7 @@ namespace InfoBase
                         else
                         {
                             cond = false;
-                            LogState($"Строка данных пользователя {index} выглядит неполной");
+                            LogState($"Строка данных пользователя \"{index}\" выглядит неполной");
                         }
                     }
 
@@ -765,7 +760,7 @@ namespace InfoBase
                     if (user_login == null && user_id == null && user_pass == null && user_name == null) { users.DeleteRow(index); }
                     else
                     {
-                        LogState($"Строка данных пользователей {index} выглядит неполной или является пустой");
+                        LogState($"Строка данных пользователей \"{index}\" выглядит неполной или является пустой");
                         cond = false;
                     }
 
@@ -796,7 +791,7 @@ namespace InfoBase
 
             if (desks == null)
             {
-                LogState($"Пересмотри вводимые тобой данные досок в файле {data_path.Split("\\")[^1]}");
+                LogState($"Пересмотри вводимые тобой данные досок в файле \"{data_path.Split("\\")[^1]}\"");
                 return false;
             }
 
@@ -814,7 +809,7 @@ namespace InfoBase
                     else
                     {
                         cond = false;
-                        LogState($"Строка данных пользователя {index} выглядит неполной");
+                        LogState($"Строка данных пользователя \"{index}\" выглядит неполной");
                     }
                 }
                 index++;
@@ -925,11 +920,12 @@ namespace InfoBase
 
         ////////////////////////////////////////////////////////////////////////////////////////
         ///////////////Базовые функции, не требующиеся в дальнейшем использовании///////////////
-        public DataBase(string logfile_path, bool consoleLogging, string progname, string version)//конструктор 
+        public DataBase(string logfile_path, bool consoleLogging, Logger log, string progname, string version)//конструктор 
         {
             log_counter = 0;
             this.version = version;
             this.progname = progname;
+            logState = log;
             desks = new();
             users = new();
             user_ids = new();
@@ -966,7 +962,7 @@ namespace InfoBase
                     if (user_login == null && user_id == null && user_password == null && user_name == null) { users.DeleteRow(index); }
                     else
                     {
-                        LogState($"Строка данных пользователя {index} выглядит неполной или является пустой");
+                        LogState($"Строка данных пользователя \"{index}\" выглядит неполной или является пустой");
                         cond = false;
                     }
                 }
@@ -1008,22 +1004,22 @@ namespace InfoBase
                     if (desk_id == null && desk_name == null && desk_type == null && user_id == null) { desks.DeleteRow(index); }
                     else if (desk_name.Contains('|'))
                     {
-                        LogState($"Строка данных доски заданий номер {index} имеет недопустимый символ");
+                        LogState($"Строка данных доски заданий номер \"{index}\" имеет недопустимый символ");
                         right = false;
                     }
                     else
                     {
-                        LogState($"Строка данных доски заданий номер {index} выглядит неполной");
+                        LogState($"Строка данных доски заданий номер \"{index}\" выглядит неполной");
                         right = false;
                     }
                 }
                 else
                 {
                     int type;
-                    if (GetUser(user_id) == null) right = false;
-                    else if (!int.TryParse(desk_type, out type)) right = false;
-                    else if (Desk.GetType(int.Parse(desk_type)) == Type.Error) right = false;
-                    else this.desks.Add(new(desk_name, GetUser(user_id), Desk.GetType(int.Parse(desk_type)), this));
+                    if (GetUser(user_id) == null) { LogState($"Пользователь \"{user_id}\" не найден"); right = false; }
+                    else if (!int.TryParse(desk_type, out type)) { LogState($"Попытки преобразовать модификатор типа \"{desk_type}\" для доски \"{desk_id}\" обречён провалом"); right = false; }
+                    else if (Desk.GetType(int.Parse(desk_type)) == Type.Error) { LogState($"Ошибочный модификатор \"{desk_type}\" для доски \"{desk_id}\", возвращено Type.Error"); right = false; }
+                    else this.desks.Add(new(desk_id, desk_name, GetUser(user_id), Desk.GetType(int.Parse(desk_type)), this));
                     index++;
                 }
             }
@@ -1046,6 +1042,7 @@ namespace InfoBase
                 {
                     LogState($"Файл \"...\\{pathToDirDays.Split("\\")[^2]}\\{name}.desk\" пуст");
                     result = false;
+                    return true;
                 }
 
                 else
@@ -1084,7 +1081,7 @@ namespace InfoBase
                             temp_cardID = parametrs[1];
                             if (parametrs[0] != "*")
                             {
-                                LogState($"Целостность строки {rowNum} нарушена, желательно перепроверить");
+                                LogState($"Целостность строки \"{rowNum}\" нарушена, желательно перепроверить");
                             }
                             bool cond1 = false;
                             state = CardReadState.ReadCheck;
@@ -1116,25 +1113,25 @@ namespace InfoBase
                             User? temp_user = GetUser(parametrs[1]);
                             if (temp_desk == null || temp_card == null)
                             {
-                                LogState($"Прочтение строки {line} безуспешно завершено. Проверьте информацию в файле {name + ".desk"} в строке {rowNum}");
+                                LogState($"Прочтение строки \"{line}\" безуспешно завершено. Проверьте информацию в файле \"{name + ".desk"}\" в строке \"{rowNum}\"");
                                 result = false;
                             }
                             else if (temp_user == null)
                             {
                                 string[] dta = data_path.Split("//");
-                                LogState($"Взятие пользователя по строке {line} безуспешно завершено. Проверьте информацию в файле {name + ".desk"} в строке {rowNum} и файле {dta[^1]}");
+                                LogState($"Взятие пользователя по строке \"{line}\" безуспешно завершено. Проверьте информацию в файле \"{name + ".desk"}\" в строке \"{rowNum}\" и файле \"{dta[^1]}\"");
                                 result = false;
                             }
                             else if (temp_desk.type == Type.Private)
                             {
                                 string[] dta = data_path.Split("//");
-                                LogState($"Считывание строки номер {rowNum} с пользователем проигнорирована, т.к. доска определена как приватная");
+                                LogState($"Считывание строки номер \"{rowNum}\" с пользователем проигнорирована, т.к. доска определена как приватная");
                                 result = false;
                             }
                             else if (temp_desk.type == Type.Error)
                             {
                                 string[] dta = data_path.Split("//");
-                                LogState($"Считывание файла с данными доски {temp_desk.id} невозможно, перепроверьте данные в {data_path.Split("//")[^1]}");
+                                LogState($"Считывание файла с данными доски \"{temp_desk.id}\" невозможно, перепроверьте данные в \"{data_path.Split("//")[^1]}\"");
                                 result = false;
                             }
                             else
@@ -1151,7 +1148,7 @@ namespace InfoBase
                                         temp_user.owner.Add(temp_desk.id);
                                         break;
                                     default:
-                                        LogState($"Неправильный вид доступа пользователя в строке. Проверьте информацию в файле \"{name}.desk\" в строке {rowNum}");
+                                        LogState($"Неправильный вид доступа пользователя в строке. Проверьте информацию в файле \"{name}.desk\" в строке \"{rowNum}\"");
                                         break;
                                 }
                             }
@@ -1161,13 +1158,13 @@ namespace InfoBase
                         {
                             if (temp_desk == null || temp_card == null)
                             {
-                                LogState($"Прочтение строки {line} безуспешно завершено. Проверьте информацию в файле {name + ".desk"} в строке {rowNum}");
+                                LogState($"Прочтение строки \"{line}\" безуспешно завершено. Проверьте информацию в файле \"{name + ".desk"}\" в строке \"{rowNum}\"");
                                 result = false;
                             }
                             else if (parametrs[0] == null || parametrs[1] == null)
                             {
                                 string[] dta = data_path.Split("//");
-                                LogState($"Взятие пользователя по строке {line} безуспешно завершено. Проверьте информацию в файле {name + ".desk"} в строке {rowNum} и файле {dta[dta.Length - 1]}");
+                                LogState($"Взятие пользователя по строке \"{line}\" безуспешно завершено. Проверьте информацию в файле \"{name + ".desk"}\" в строке \"{rowNum}\" и файле \"{dta[^1]}\"");
                                 result = false;
                             }
                             else
@@ -1178,7 +1175,7 @@ namespace InfoBase
                         else if (parametrs == null || falseCard || falseCheck) { }
                         else
                         {
-                            LogState($"Неверный формат данных в строке {line}");
+                            LogState($"Неверный формат данных в строке \"{line}\"");
                             result = false;
                         }
                         rowNum++;
