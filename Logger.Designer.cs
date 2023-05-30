@@ -38,10 +38,10 @@
             // 
             richTextBox1.Location = new Point(20, 46);
             richTextBox1.Name = "richTextBox1";
+            richTextBox1.ReadOnly = true;
             richTextBox1.Size = new Size(752, 383);
             richTextBox1.TabIndex = 0;
             richTextBox1.Text = "";
-            richTextBox1.ReadOnly = true;
             // 
             // button1
             // 
@@ -56,11 +56,11 @@
             // label1
             // 
             label1.AutoSize = true;
-            label1.Location = new Point(355, 9);
+            label1.Location = new Point(250, 7);
             label1.Name = "label1";
-            label1.Size = new Size(417, 30);
+            label1.Size = new Size(522, 30);
             label1.TabIndex = 2;
-            label1.Text = "Данные логи не обновляются автоматически, поэтому следует нажимать \r\nна кнопку обновления логов для получения новой информации";
+            label1.Text = "Если данные логи не обновляются автоматически, следует нажимать на кнопку обновления \r\nлогов для получения новой информации либо нажимать просто на всякий случай";
             // 
             // Logger
             // 
@@ -70,6 +70,7 @@
             Controls.Add(label1);
             Controls.Add(button1);
             Controls.Add(richTextBox1);
+            FormBorderStyle = FormBorderStyle.FixedSingle;
             Icon = (Icon)resources.GetObject("$this.Icon");
             Name = "Logger";
             Text = "Logger";

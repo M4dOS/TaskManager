@@ -8,6 +8,10 @@
             InitializeComponent();
             start = new(DateTime.Now.Ticks);
         }
+        public void LogUpdate()
+        {
+            button1_Click(null, EventArgs.Empty);
+        }
         public void button1_Click(object sender, EventArgs e)//событие по нажатию кнопки обновления логов 
         {
             string text = string.Empty;
@@ -34,9 +38,12 @@
                 }
                 text = "Количество записей в логах: " + $"{c}        Время нового запуска: {start:HH:mm:ss.fff dd.MM.yyyy}" + text;
             }
-            catch(Exception ex) { text = "Количество записей в логах: " + $"0        Время нового запуска: {start:HH:mm:ss.fff dd.MM.yyyy}" +
+            catch (Exception ex)
+            {
+                text = "Количество записей в логах: " + $"0        Время нового запуска: {start:HH:mm:ss.fff dd.MM.yyyy}" +
                            "\nЛога текущего дня не существует, перепроверьте файлы и работоспособность программы" +
-                           $"\nТекущее сообщение ошибки: {ex.Message}"; }
+                           $"\nТекущее сообщение ошибки: {ex.Message}";
+            }
             richTextBox1.Text = text;
         }
     }

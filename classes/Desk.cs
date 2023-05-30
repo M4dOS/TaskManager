@@ -63,7 +63,7 @@ namespace TaskManager
         {
             if ((desk.name.Clone() as string) != null) name = desk.name.Clone() as string;
             else name = string.Empty;
-            /*owner = desk.owner;*/
+            owner = new(desk.owner, db, unic_id);
             if (unic_id) id = IDCreator(db);
             else id = desk.id;
             type = desk.type;

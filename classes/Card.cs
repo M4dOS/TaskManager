@@ -11,7 +11,6 @@ namespace TaskManager
         public Check checkList; //"чек-лист" 
         public string id; //идентификатор задачи 
         public string desk_id; //идентификатор привязанной доски 
-        /*public DateTime deadline; //срок задачи*/
         public bool done; //состояние задачи 
 
         string IDCreator(DataBase db)//создание идентификатора 
@@ -44,9 +43,10 @@ namespace TaskManager
             }
             return false;
         }
-        public Card(string name, bool done, string info, DataBase db)//ручное создание 
+        public Card(string desk_id, string name, bool done, string info, DataBase db)//ручное создание 
         {
             this.name = name;
+            this.desk_id = desk_id;
             this.info = info;
             checkList = new();
             id = IDCreator(db);
@@ -68,15 +68,17 @@ namespace TaskManager
             else name = string.Empty;
             if ((card.info.Clone() as string) != null) info = card.info.Clone() as string;
             else info = string.Empty;
-            /*this.checkList = card.checkList;*/
+            checkList = new(card.checkList);
             if (unic_id) id = IDCreator(db);
             else id = card.id;
             done = false;
+            desk_id = card.desk_id;
         }
         public Card(DataBase db, bool id_need)//пустышка 
         {
             name = string.Empty;
             info = string.Empty;
+            desk_id = string.Empty;
             if (id_need) id = IDCreator(db);
             else id = string.Empty;
             done = false;

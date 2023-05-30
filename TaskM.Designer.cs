@@ -40,7 +40,7 @@ namespace TaskManager
             ClientSize = new Size(800, 450);
             Icon = (Icon)resources.GetObject("$this.Icon");
             Name = "TaskM";
-            Text = "TaskM";
+            Text = "{тут будет какое-то имя программы и его версия}";
             Load += TaskM_Load;
             ResumeLayout(false);
         }
