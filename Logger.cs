@@ -1,17 +1,26 @@
-﻿namespace TaskManager
+﻿using Microsoft.VisualBasic.ApplicationServices;
+
+namespace TaskManager
 {
     public partial class Logger : Form
     {
         DateTime start;//начало запуска программы 
+        public DataBase db;
         public Logger()//конструктор тела логгера 
         {
             InitializeComponent();
             start = new(DateTime.Now.Ticks);
+            this.db = db;
         }
         public void LogUpdate()
         {
             button1_Click(null, EventArgs.Empty);
         }
+        public void Tree()
+        {
+            button2_Click(null, EventArgs.Empty);
+        }
+
         public void button1_Click(object sender, EventArgs e)//событие по нажатию кнопки обновления логов 
         {
             string text = string.Empty;
@@ -36,14 +45,63 @@
                     if (evnt < start) { }
                     else { text += '\n' + str; c++; }
                 }
-                text = "Количество записей в логах: " + $"{c}        Время нового запуска: {start:HH:mm:ss.fff dd.MM.yyyy}" + text;
+                text = $"Количество записей в логах: {c}\t\t\tВремя нового запуска: {start:HH:mm:ss.fff dd.MM.yyyy}" + text;
             }
             catch (Exception ex)
             {
-                text = "Количество записей в логах: " + $"0        Время нового запуска: {start:HH:mm:ss.fff dd.MM.yyyy}" +
+                text = $"Количество записей в логах: 0\t\t\tВремя нового запуска: {start:HH:mm:ss.fff dd.MM.yyyy}" +
                            "\nЛога текущего дня не существует, перепроверьте файлы и работоспособность программы" +
                            $"\nТекущее сообщение ошибки: {ex.Message}";
             }
+            richTextBox1.Text = text;
+        }
+        public void button2_Click(object sender, EventArgs e)//вырисовка "дерева" 
+        {
+            string text = string.Empty;
+
+            text += $"Существующие пользователи: {db.users.Count}\n";
+            foreach (var user in db.users)
+            {
+                text += $"\t{user.name} | {user.login} | ID: {user.id}\n";
+                foreach (var desk in user.guest)
+                {
+                    text += $"\t\tID: {desk} | Доступ: зритель\n";
+                }
+                foreach (var desk in user.admin)
+                {
+                    text += $"\t\tID: {desk} | Доступ: Редактор\n";
+                }
+                foreach (var desk in user.guest)
+                {
+                    text += $"\t\tID: {desk} | Доступ: Создатель\n";
+                }
+            }
+            text += '\n';
+
+            text += $"Существующие доски: {db.desks.Count}\n";
+            foreach (var desk in db.desks)
+            {
+                string t = "";
+                if (desk.type == Type.Public) t = "Публичная";
+                if (desk.type == Type.Public) t = "Приватная";
+                else t = "Ошибка";
+                text += $"\tID: {desk.id} | {desk.name} | Создатель: {desk.owner.name} | Тип доски: {t} | Количество карточек: {desk.cards.Count}\n";
+                foreach (var card in desk.cards)
+                {
+                    string st0 = card.done ? "Сделано" : "не сделано";
+                    text += $"\t\tID: {card.id} | {card.name} | Готовность: {st0} | Количество пунктов в чек-листе: {card.checkList.tasks.Count}\n";
+                    int id = 0;
+                    foreach (var task in card.checkList.tasks)
+                    {
+                        
+                        string st = task.done ? "Сделано" : "не сделано";
+                        text += $"\t\t\tID: {id}| {task.name} | Готовность: {st} | {task.card_id}\n";
+                        id++;
+                    }
+                    
+                }
+            }
+
             richTextBox1.Text = text;
         }
     }

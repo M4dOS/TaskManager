@@ -42,6 +42,7 @@ namespace TaskManager
             Name = "TaskM";
             Text = "{тут будет какое-то имя программы и его версия}";
             Load += TaskM_Load;
+            Shown += TaskM_Shown;
             ResumeLayout(false);
         }
 
