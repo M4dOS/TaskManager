@@ -8,8 +8,9 @@
 
         private void Main(string[] args)//основная программа (только здесь можно использовать свои функции и проверки) 
         {
-            var card1 = db.GetCard("eoa71BFthJHwA6iY");
-            var card2 = new Card(card1, db, false);
+            var u1 = db.GetDesk("m9OPI7wT");
+            u1.id = "mzePI7wT";
+            db.AddDesk(u1);
         }
 
 

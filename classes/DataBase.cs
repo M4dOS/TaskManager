@@ -1,5 +1,4 @@
-﻿using DocumentFormat.OpenXml.Office2016.Drawing.Command;
-using OfficeOpenXml;
+﻿using OfficeOpenXml;
 
 namespace TaskManager
 {
@@ -104,7 +103,7 @@ namespace TaskManager
             if (b) return 1;
             else return 0;
         }
-        public User RandLogPass(string name)//создание автоматически сгенерированного пользователя
+        public User RandLogPass(string name)//создание автоматически сгенерированного пользователя, но не регистрирует его в датабазе(!)
         {
             // Создание генератора случайных чисел
             Random random = new Random();
@@ -119,17 +118,33 @@ namespace TaskManager
             LogState($"(bC1) Успешно создан в памяти пользователь с следующими данными (логин|пароль) : {login}|{password}");
             return new(login, password, name, this);
         }
+        public User? GetFullUser(string login, string name)//найти пользователя по логину и имени 
+        {
+            bool cond = false;
+            foreach (User user in users)
+            {
+                if (user.name == name && user.login == login) { cond = true; return user; }
+            }
+            if (!cond)
+            {
+                LogState($"(GFU1) Пользователя с именем \"{name}\" и логином \"{login}\" нету в базе данных");
+            }
+
+            return null;
+        }
+
+
 
         //рабочие инструменты базы данных
         public Task? GetTask(string desk_id, string card_id, string name)//получение пункта в чек-листе 
         {
             bool cond = true;
-            if(GetDesk(desk_id) == null)
+            if (GetDesk(desk_id) == null)
             {
                 LogState($"(GT1) Доска с идентификатором {desk_id} не найдена");
                 cond = false;
             }
-            if(GetCard(card_id) == null)
+            if (GetCard(card_id) == null)
             {
                 LogState($"(GT2) Карта с идентификатором {card_id} для доски с идентификатором {desk_id} не найдена");
                 cond = false;
@@ -139,83 +154,138 @@ namespace TaskManager
                 LogState($"(GT3) Для карты с идентификатором {card_id} в доске с идентификатором {desk_id} не найден чек-лист");
                 cond = false;
             }
-            if(cond == true) foreach(var task in desks.Find(x => x.id == desk_id).cards.Find(x => x.id == card_id).checkList.tasks)
-            {
-                    if(task.name == name) return task;
-            }
+            if (cond == true) foreach (Task task in desks.Find(x => x.id == desk_id).cards.Find(x => x.id == card_id).checkList.tasks)
+                {
+                    if (task.name == name) return task;
+                }
             LogState($"(GT4) Попытка найти пункт с именем {name} чек-листа карточки с идентификатором {card_id} доски с идентификатором {desk_id} не вышло");
             return null;
         }
-        public bool DeleteTask(Task old_task)//удаление пункта в чек-листе 
+        public bool DeleteTask(Task delete_task)//удаление пункта в чек-листе 
         {
-            bool cond = true;
+            bool cond = false;
 
-            var old_task_card = GetCard(old_task.card_id);
+            Card? old_task_card = GetCard(delete_task.card_id);
 
             string fileTaskOld = desks_path + old_task_card.desk_id + ".desk";
 
-            string ftold_context = File.ReadAllText(fileTaskOld);
+            try
+            {
+                string ftold_context = File.ReadAllText(fileTaskOld);
 
-            if (desks.Find(x => x.id == old_task_card.desk_id).cards.Find(x => x.id == old_task.card_id).checkList.tasks.Remove(old_task))
-            {
-                ftold_context.Replace($"{old_task.name}|{boolConvert(old_task.done)}\n", String.Empty);
+                if (desks.Find(x => x.id == old_task_card.desk_id).cards.Find(x => x.id == delete_task.card_id).checkList.tasks.Remove(delete_task))
+                {
+                    List<string> lines = ftold_context.Split('\n').ToList();
+                    bool c = false;
+                    bool incheck = false;
+                    for (int i = 0; i < lines.Count; i++)
+                    {
+                        if (c)
+                        {
+                            if (lines[i].Split('|').Length == 3)
+                            {
+                                incheck = !incheck;
+                            }
+                        }
+
+                        if (incheck)
+                        {
+                            if (lines[i].Split('|')[0].Trim() == delete_task.name)
+                            {
+                                lines.RemoveAt(i); cond = true; break;
+                            }
+                        }
+
+                        if (lines[i].Split('|').Length == 4)
+                        {
+                            if (lines[i].Split('|')[0] == delete_task.card_id)
+                            {
+                                c = true;
+                            }
+                        }
+                    }
+                    ftold_context = string.Join('\n', lines.ToArray());
+                }
+                else
+                {
+                    LogState($"(DT1) Удаляемый пункт карточки \"{delete_task.card_id}\" с именем \"{delete_task.name}\"не найден");
+                    cond = false;
+                }
+
+                if (cond)
+                {
+                    File.WriteAllText(fileTaskOld, ftold_context);
+                }
             }
-            else
+            catch (Exception ex)
             {
-                LogState($"(DT1) Заменяемый пункт карточки \"{old_task.card_id}\" не найден");
-                cond = false;
+                LogState($"(DT2) Возникла следующая ошибка: {ex.Message}");
             }
 
-            if (cond)
-            {
-                File.WriteAllText(fileTaskOld, ftold_context);
-            }
             return cond;
         }
         public bool AddTask(Task new_task)//добавление пункта в чек-листе 
         {
-            bool cond = true;
+            bool cond = false;
 
-            var new_task_card = GetCard(new_task.card_id);
+            Card? old_task_card = GetCard(new_task.card_id);
 
-            string fileTaskNew = desks_path + new_task_card.desk_id + ".desk";
+            string fileTaskOld = desks_path + old_task_card.desk_id + ".desk";
 
-            string ftnew_context = File.ReadAllText(fileTaskNew);
-
-            if (!ftnew_context.Contains($"{new_task.name}|{boolConvert(new_task.done)}"))
+            try
             {
-                desks.Find(x => x.id == new_task_card.desk_id).cards.Find(x => x.id == new_task.card_id).checkList.tasks.Add(new_task);
-                var ftnew_lines = ftnew_context.Split('\n');
-                bool find = false;
-                bool cond1 = false;
-                int count = 0;
-                foreach (var line in ftnew_lines)
+                string ftold_context = File.ReadAllText(fileTaskOld);
+
+                if (desks.Find(x => x.id == old_task_card.desk_id).cards.Find(x => x.id == new_task.card_id) != null)
                 {
-                    if (cond1 && !find) break;
-                    string[] paramts = line.Split('|');
-
-                    if (paramts.Length == 3 && paramts[0] == "*" && paramts[1] == new_task.card_id)
+                    
+                    List<string> lines = ftold_context.Split('\n').ToList();
+                    bool c = false;
+                    bool incheck = false;
+                    for (int i = 0; i < lines.Count; i++)
                     {
-                        find = !find;
+                        if (c)
+                        {
+                            if (lines[i].Split('|').Length == 3)
+                            {
+                                incheck = !incheck;
+                                if (!incheck)
+                                {
+                                    lines.Insert(i, $"{new_task.name}|{boolConvert(new_task.done)}");
+                                    cond = true;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (lines[i].Split('|').Length == 4)
+                        {
+                            if (lines[i].Split('|')[0] == new_task.card_id)
+                            {
+                                c = true;
+                            }
+                            else c = false;
+                        }
                     }
-                    if (find) cond1 = true;
-
-                    count++;
+                    ftold_context = string.Join('\n', lines.ToArray());
                 }
-                var cntxt = ftnew_lines.ToList();
-                cntxt.Insert(count, $"{new_task.name}|{boolConvert(new_task.done)}\n");
-                ftnew_context = string.Join('\n', cntxt.ToArray());
+                else
+                {
+                    LogState($"(AT1) Карточка \"{new_task.card_id}\" не найдена для добавления пункта");
+                    cond = false;
+                }
+
+                if (cond)
+                {
+                    File.WriteAllText(fileTaskOld, ftold_context);
+                    desks.Find(x => x.id == old_task_card.desk_id).cards.Find(x => x.id == new_task.card_id).checkList.tasks.Add(new_task);
+                }
             }
-            else
+            catch (Exception ex)
             {
-                LogState($"(AT1) Новый пункт карточки \"{new_task.card_id}\" уже существует");
-                cond = false;
+                LogState($"(AT2) Возникла следующая ошибка: {ex.Message}");
             }
 
-            if (cond)
-            {
-                File.WriteAllText(fileTaskNew, ftnew_context);
-            }
             return cond;
         }
         public bool MoveTask(Task move_task, int zero_position)///смещение позиции пункта в чек-листе 
@@ -251,8 +321,9 @@ namespace TaskManager
             }
             else
             {
-                if (this.desks.Find(x => x.id == delete_card.desk_id).cards.Remove(GetCard(delete_card.id)))
+                if (desks.Find(x => x.id == delete_card.desk_id).cards.Remove(GetCard(delete_card.id)))
                 {
+                    desk_ids.Remove(delete_card.id);
                     /*desk.cards.Add(new_card);*/
                     string filePath;
                     try
@@ -339,28 +410,28 @@ namespace TaskManager
             Desk? desk = GetDesk(new_card.desk_id);
             if (desk == null)
             {
-                LogState("(AD1) Произошла непредвиденная ошибка поиска, дальнейшая смена карточки невозможна. Перепроверьте все вводимые данные");
+                LogState("(AC1) Произошла непредвиденная ошибка поиска, дальнейшая смена карточки невозможна. Перепроверьте все вводимые данные");
                 return false;
             }
             else
             {
-                this.desks.Find(x => x.id == new_card.desk_id).cards.Add(new_card);
+                
                 string filePath;
                 try
                 {
                     filePath = desks_path + new_card.desk_id + ".desk"; //путь к файлу 
                 }
-                catch (Exception ex) { LogState($"(AD2) Возникла следующая ошибка: {ex.Message}"); return false; }
+                catch (Exception ex) { LogState($"(AC2) Возникла следующая ошибка: {ex.Message}"); return false; }
 
                 /*eoa71BFthJHwA6iY|задача 1|нужно что-то там сделать (зачемто)|0*/
 
-                string newLine = new_card.id + '|' + new_card.name + '|' + new_card.info + '|' + boolConvert(new_card.done)+'\n'; //новая строка, которой заменится найденная строка 
-                newLine += "*|" + new_card.id + '|' + boolConvert(new_card.checkList.done)+ '\n';
+                string newLine = new_card.id + '|' + new_card.name + '|' + new_card.info + '|' + boolConvert(new_card.done) + '\n'; //новая строка, которой заменится найденная строка 
+                newLine += "*|" + new_card.id + '|' + boolConvert(new_card.checkList.done) + '\n';
                 foreach (TaskManager.Task task in new_card.checkList.tasks)
                 {
-                    newLine +=  task.name + '|' + boolConvert(task.done)+ '\n';
+                    newLine += task.name + '|' + boolConvert(task.done) + '\n';
                 }
-                newLine += "*|" + new_card.id + '|' + boolConvert(new_card.checkList.done)+'\n';
+                newLine += "*|" + new_card.id + '|' + boolConvert(new_card.checkList.done) + '\n';
 
 
                 //открываем файл для чтения и записи 
@@ -385,10 +456,12 @@ namespace TaskManager
                     // Заменяем исходный файл временным файлом
                     File.Delete(filePath);
                     File.Move(tempFilePath, filePath);
+
+                    desks.Find(x => x.id == new_card.desk_id).cards.Add(new(new_card, this, false));
                 }
                 catch (IOException ex)
                 {
-                    LogState("(AD3) Возникла следующая ошибка: " + ex.Message);
+                    LogState("(AC3) Возникла следующая ошибка: " + ex.Message);
                     return false;
                 }
 
@@ -415,20 +488,6 @@ namespace TaskManager
             }
             return null;
         }
-        public User? GetFullUser(string login, string name)//найти пользователя по логину и имени 
-        {
-            bool cond = false;
-            foreach (User user in users)
-            {
-                if (user.name == name && user.login == login) { cond = true; return user; }
-            }
-            if (!cond)
-            {
-                LogState($"(GFU1) Пользователя с именем \"{name}\" и логином \"{login}\" нету в базе данных");
-            }
-
-            return null;
-        }
         public bool DeleteUser(User delete_user)//удалить пользователя 
         {
             string fullPath = users_path;
@@ -448,12 +507,13 @@ namespace TaskManager
             }
             else
             {
-                LogState("(DU2) Не получилось изменить запись (возможно, заменяемого вами пользователя не существует)");
+                LogState("(DU2) Не получилось изменить пользователя");
                 return false;
             }
 
             if (this.users.Remove(GetUser(delete_user.id)))
             {
+                user_ids.Remove(delete_user.id);
                 /*this.users.Insert(indexToIns, new_user);*/
                 int index = 1;
                 bool cond = true;
@@ -468,7 +528,7 @@ namespace TaskManager
                         if (user_login == null && user_id == null && user_pass == null && user_name == null) { users.DeleteRow(index); }
                         else
                         {
-                            LogState($"(DU3) Строка данных пользователей \"{index}\" выглядит неполной или является пустой");
+                            LogState($"(DU3) Строка данных пользователей \"{index}\" выглядит неполной");
                             cond = false;
                         }
 
@@ -477,87 +537,64 @@ namespace TaskManager
                     index++;
                 }
 
-                foreach (string id in delete_user.owner)
+                List<string> fileTaskOld = new();
+                foreach (string desk_id in delete_user.owner)
                 {
-                    string filePath = desks_path + id + ".desk";
-                    if (File.Exists(filePath))
-                    {
-                        string tempFilePath = System.IO.Path.GetTempFileName();
-                        using (StreamReader reader = new(filePath))
-                        {
-                            using (StreamWriter writer = new(tempFilePath))
-                            {
-                                string line = reader.ReadLine();
-                                if (line.Split('|').Count() == 2)
-                                {
-                                    if (line.Split('|')[1] == delete_user.id) { }
-                                    else writer.WriteLine(line);
-                                }
-                                else writer.WriteLine(line);
-                            }
-                        }
-                        File.Delete(filePath);
-                        File.Move(tempFilePath, filePath);
-                    }
-                    else
-                    {
-                        LogState($"(DU4) Файла с информацией о доске {id} нету в директории с досками");
-                    }
+                    fileTaskOld.Add(desks_path + @"\" + desk_id + ".desk");
                 }
-                foreach (string id in delete_user.admin)
+                foreach (string desk_id in delete_user.admin)
                 {
-                    string filePath = desks_path + id + ".desk";
-                    if (File.Exists(filePath))
-                    {
-                        string tempFilePath = System.IO.Path.GetTempFileName();
-                        using (StreamReader reader = new(filePath))
-                        {
-                            using (StreamWriter writer = new(tempFilePath))
-                            {
-                                string line = reader.ReadLine();
-                                if (line.Split('|').Count() == 2)
-                                {
-                                    if (line.Split('|')[1] == delete_user.id) { }
-                                    else writer.WriteLine(line);
-                                }
-                                else writer.WriteLine(line);
-                            }
-                        }
-                        File.Delete(filePath);
-                        File.Move(tempFilePath, filePath);
-                    }
-                    else
-                    {
-                        LogState($"(DU5) Файла с информацией о доске {id} нету в директории с досками");
-                    }
+                    fileTaskOld.Add(desks_path + @"\" + desk_id + ".desk");
                 }
-                foreach (string id in delete_user.guest)
+                foreach (string desk_id in delete_user.guest)
                 {
-                    string filePath = desks_path + id + ".desk";
-                    if (File.Exists(filePath))
-                    {
-                        string tempFilePath = System.IO.Path.GetTempFileName();
-                        using (StreamReader reader = new(filePath))
-                        {
-                            using (StreamWriter writer = new(tempFilePath))
-                            {
-                                string line = reader.ReadLine();
-                                if (line.Split('|').Count() == 2)
-                                {
-                                    if (line.Split('|')[1] == delete_user.id) { }
-                                    else writer.WriteLine(line);
-                                }
-                                else writer.WriteLine(line);
-                            }
-                        }
-                        File.Delete(filePath);
-                        File.Move(tempFilePath, filePath);
-                    }
-                    else
-                    {
-                        LogState($"(DU6) Файла с информацией о доске {id} нету в директории с досками");
-                    }
+                    fileTaskOld.Add(desks_path + @"\" + desk_id + ".desk");
                 }
+
+                fileTaskOld = fileTaskOld.Distinct().ToList();
+
+                if (cond) try
+                {
+                    foreach (string path in fileTaskOld)
+                    {
+                        string ftold_context = File.ReadAllText(path);
+
+                        if (desk_ids.Contains(path.Split('\\')[^1].Split(".desk")[0]))
+                        {
+                            List<string> lines = ftold_context.Split('\n').ToList();
+                            bool c = false;
+                            for (int i = 0; i < lines.Count; i++)
+                            {
+                                if (lines[i].Split('|').Length == 3) c = !c;
+                                else if (lines[i].Split('|').Length == 4) c = true;
+                                else if (lines[i].Split('|').Length == 2 && c)
+                                {
+                                    if (lines[i].Trim().Split('|')[1] == delete_user.id)
+                                    {
+                                        lines.RemoveAt(i);
+                                    }
+                                }
+                            }
+                            ftold_context = string.Join('\n', lines.ToArray());
+                        }
+                        else
+                        {
+                            LogState($"(DU4) Удаляемый пользователь \"{delete_user.id}\" не найден");
+                            cond = false;
+                        }
+
+                        if (cond)
+                        {
+                            File.WriteAllText(path, ftold_context);
+                        }
+                    }
+
+                }
+                catch (Exception ex)
+                {
+                    LogState($"(DU5) Возникла следующая ошибка: {ex.Message}");
+                }
+
 
                 if (cond)
                 {
@@ -569,7 +606,7 @@ namespace TaskManager
             }
             else
             {
-                LogState("(DU7) Не получилось изменить карточку (возможно, заменяемого вами пользователя не существует)");
+                LogState("(DU6) Не получилось удалить пользователя");
                 return false;
             }
         }
@@ -610,90 +647,76 @@ namespace TaskManager
             users.Cells.SetCellValue(index - 1, 2, new_user.password);
             users.Cells.SetCellValue(index - 1, 3, new_user.name);
 
-            foreach (string id in new_user.owner)
+            try
             {
-                string filePath = desks_path + id + ".desk";
-                if (File.Exists(filePath))
+                List<string> fileTaskOld = new();
+
+                fileTaskOld.Add("***");
+                foreach (string desk_id in new_user.owner)
                 {
-                    string tempFilePath = System.IO.Path.GetTempFileName();
-                    using (StreamReader reader = new(filePath))
+                    fileTaskOld.Add(desks_path + @"\" + desk_id + ".desk");
+                }
+                fileTaskOld.Add("**");
+                foreach (string desk_id in new_user.admin)
+                {
+                    fileTaskOld.Add(desks_path + @"\" + desk_id + ".desk");
+                }
+                fileTaskOld.Add("*");
+                foreach (string desk_id in new_user.guest)
+                {
+                    fileTaskOld.Add(desks_path + @"\" + desk_id + ".desk");
+                }
+
+                U stat = U.User;
+
+                if (cond) try
                     {
-                        using (StreamWriter writer = new(tempFilePath))
+                        foreach (string path in fileTaskOld)
                         {
-                            string line = reader.ReadLine();
-                            if (line.Split('|').Count() == 4)
+                            if (path == "*") stat = U.User;
+                            else if (path == "**") stat = U.Admin;
+                            else if (path == "***") stat = U.Owner;
+                            else
                             {
-                                writer.WriteLine(line);
-                                writer.WriteLine($"2|{new_user.id}");
+                                string ftold_context = File.ReadAllText(path);
+
+                                if (desk_ids.Contains(path.Split('\\')[^1].Split(".desk")[0]))
+                                {
+                                    List<string> lines = ftold_context.Split('\n').ToList();
+                                    for (int i = 0; i < lines.Count; i++)
+                                    {
+                                        if (lines[i].Split('|').Length == 4) lines.Insert(i + 1, $"{(int)stat}|{new_user.id}");
+                                    }
+                                    ftold_context = string.Join('\n', lines.ToArray());
+                                }
+                                else
+                                {
+                                    LogState($"(AU3) Поиск данных для обновления доски \"{path.Split('\\')[^1].Split(".desk")[0]}\" безуспешно завершён");
+                                    cond = false;
+                                }
+
+                                if (cond)
+                                {
+                                    File.WriteAllText(path, ftold_context);
+                                }
                             }
-                            else writer.WriteLine(line);
                         }
+
                     }
-                    File.Delete(filePath);
-                    File.Move(tempFilePath, filePath);
-                }
-                else
-                {
-                    LogState($"(AU3) Файла с информацией о доске {id} нету в директории с досками");
-                }
+                    catch (Exception ex)
+                    {
+                        LogState($"(AU4) Возникла следующая ошибка: {ex.Message}");
+                    }
             }
-            foreach (string id in new_user.admin)
+            catch (Exception ex)
             {
-                string filePath = desks_path + id + ".desk";
-                if (File.Exists(filePath))
-                {
-                    string tempFilePath = System.IO.Path.GetTempFileName();
-                    using (StreamReader reader = new(filePath))
-                    {
-                        using (StreamWriter writer = new(tempFilePath))
-                        {
-                            string line = reader.ReadLine();
-                            if (line.Split('|').Count() == 4)
-                            {
-                                writer.WriteLine(line);
-                                writer.WriteLine($"1|{new_user.id}");
-                            }
-                            else writer.WriteLine(line);
-                        }
-                    }
-                    File.Delete(filePath);
-                    File.Move(tempFilePath, filePath);
-                }
-                else
-                {
-                    LogState($"(AU4) Файла с информацией о доске {id} нету в директории с досками");
-                }
+                LogState($"(AU5) Возникла следующая ошибка: {ex.Message}");
             }
-            foreach (string id in new_user.guest)
-            {
-                string filePath = desks_path + id + ".desk";
-                if (File.Exists(filePath))
-                {
-                    string tempFilePath = System.IO.Path.GetTempFileName();
-                    using (StreamReader reader = new(filePath))
-                    {
-                        using (StreamWriter writer = new(tempFilePath))
-                        {
-                            string line = reader.ReadLine();
-                            if (line.Split('|').Count() == 4)
-                            {
-                                writer.WriteLine(line);
-                                writer.WriteLine($"0|{new_user.id}");
-                            }
-                            else writer.WriteLine(line);
-                        }
-                    }
-                    File.Delete(filePath);
-                    File.Move(tempFilePath, filePath);
-                }
-                else
-                {
-                    LogState($"(AU5) Файла с информацией о доске {id} нету в директории с досками");
-                }
-            }
+
 
             if (cond)
             {
+                this.users.Add(new(new_user, this, false));
                 FileInfo excelFile = new(fullPath);
                 excel.SaveAs(excelFile);
             }
@@ -746,6 +769,7 @@ namespace TaskManager
             if (this.desks.Remove(GetDesk(delete_desk.id)))
             {
                 /*this.desks.Insert(indexToIns, new_desk);*/
+                desk_ids.Remove(delete_desk.id);
                 int index = 1;
                 while (index <= desks.Dimension.End.Row)
                 {
@@ -763,7 +787,7 @@ namespace TaskManager
                         }
                     }
 
-                    else if (delete_desk.id == desk_id) { desks.DeleteRow(index); }
+                    else if (delete_desk.id == desk_id) { desks.DeleteRow(index); desk_ids.Remove(delete_desk.id); }
                     index++;
                 }
 
@@ -824,49 +848,73 @@ namespace TaskManager
             desks.Cells.SetCellValue(index - 1, 3, new_desk.owner.id);
 
             string fileDeskNew = desks_path + new_desk.id + ".desk";
-            File.Create(fileDeskNew);
-            using (StreamWriter writer = new(fileDeskNew))
-            {
-                foreach (string id in desk_ids)
-                {
-                    if (GetDesk(id) == null) { LogState($"Доска с идентификатором {id} не найдена"); }
-                    else
-                    {
-                        foreach (Card card in this.desks.Find(x => x.id == id).cards)
-                        {
-                            writer.WriteLine($"{card.id}|{card.name}|{card.info}|{boolConvert(card.done)}");
-                            if (GetDesk(id).type == Type.Private) { }
-                            else if (GetDesk(id).type == Type.Public)
-                            {
-                                foreach (string uid in user_ids)
-                                {
-                                    if (GetUser(uid) == null) LogState($"Пользователь с идентификатором {id} для доски с идентификатором {id} не найден");
-                                    else
-                                    {
-                                        if (GetUser(uid).owner.Contains(new_desk.id)) writer.WriteLine($"2|{uid}");
-                                        if (GetUser(uid).admin.Contains(new_desk.id)) writer.WriteLine($"1|{uid}");
-                                        if (GetUser(uid).guest.Contains(new_desk.id)) writer.WriteLine($"0|{uid}");
-                                    }
-                                }
-                            }
-                            else { LogState($"Доска с идентификатором {id} имеет ошибочный тип"); return false; }
+            if(!File.Exists(fileDeskNew)) File.Create(fileDeskNew);
 
-                            if (card.checkList == null) { }
-                            else
-                            {
-                                string edge = $"*|{card.id}|{boolConvert(card.checkList.done)}";
-                                writer.WriteLine(edge);
-                                foreach (Task task in card.checkList.tasks)
-                                {
-                                    writer.WriteLine($"{task.name}|{boolConvert(task.done)}");
-                                }
-                                writer.WriteLine(edge);
-                            }
-                        }
+            List<string> context = new();
+
+            foreach(var card in new_desk.cards)
+            {
+                context.Add($"{card.id}|{card.name}|{card.info}|{boolConvert(card.done)}");
+                foreach(var user in users)
+                {
+                    if(user.owner.Find(x => x == new_desk.id) != null) context.Add($"2|{user.id}");
+                    if (user.admin.Find(x => x == new_desk.id) != null) context.Add($"1|{user.id}");
+                    if (user.guest.Find(x => x == new_desk.id) != null) context.Add($"0|{user.id}");
+                }
+                if(card.checkList != null)
+                {
+                    context.Add($"*|{card.name}|{card.id}|{boolConvert(card.checkList.done)}");
+                    foreach (var task in card.checkList.tasks)
+                    {
+                        context.Add($"{task.name}|{boolConvert(task.done)}");
                     }
+                    context.Add($"*|{card.name}|{card.id}|{boolConvert(card.checkList.done)}");
                 }
             }
+            
+            File.WriteAllText(fileDeskNew, string.Join('\n', context.ToArray()));
 
+            /* using (StreamWriter writer = new(fileDeskNew))
+             {
+                 foreach (string id in desk_ids)
+                 {
+                     if (GetDesk(id) == null) { LogState($"Доска с идентификатором {id} не найдена"); }
+                     else
+                     {
+                         foreach (Card card in this.desks.Find(x => x.id == id).cards)
+                         {
+                             writer.WriteLine($"{card.id}|{card.name}|{card.info}|{boolConvert(card.done)}");
+                             if (GetDesk(id).type == Type.Private) { }
+                             else if (GetDesk(id).type == Type.Public)
+                             {
+                                 foreach (string uid in user_ids)
+                                 {
+                                     if (GetUser(uid) == null) LogState($"Пользователь с идентификатором {id} для доски с идентификатором {id} не найден");
+                                     else
+                                     {
+                                         if (GetUser(uid).owner.Contains(new_desk.id)) writer.WriteLine($"2|{uid}");
+                                         if (GetUser(uid).admin.Contains(new_desk.id)) writer.WriteLine($"1|{uid}");
+                                         if (GetUser(uid).guest.Contains(new_desk.id)) writer.WriteLine($"0|{uid}");
+                                     }
+                                 }
+                             }
+                             else { LogState($"Доска с идентификатором {id} имеет ошибочный тип"); return false; }
+
+                             if (card.checkList == null) { }
+                             else
+                             {
+                                 string edge = $"*|{card.id}|{boolConvert(card.checkList.done)}";
+                                 writer.WriteLine(edge);
+                                 foreach (Task task in card.checkList.tasks)
+                                 {
+                                     writer.WriteLine($"{task.name}|{boolConvert(task.done)}");
+                                 }
+                                 writer.WriteLine(edge);
+                             }
+                         }
+                     }
+                 }
+             }*/
 
             if (cond)
             {
@@ -877,6 +925,8 @@ namespace TaskManager
         }
         public bool MoveDesk(Desk move_desk, int zero_position)///смещение позиции доски в списке всех досок 
         { return true; }
+
+
 
 
         ////////////////////////////////////////////////////////////////////////////////////////
@@ -1108,7 +1158,7 @@ namespace TaskManager
                                 switch (parametrs[0])
                                 {
                                     case "0":
-                                        if(!users.Find(x => x.id == parametrs[1]).guest.Contains(temp_desk.id)) users.Find(x => x.id == parametrs[1]).guest.Add(temp_desk.id);
+                                        if (!users.Find(x => x.id == parametrs[1]).guest.Contains(temp_desk.id)) users.Find(x => x.id == parametrs[1]).guest.Add(temp_desk.id);
                                         break;
                                     case "1":
                                         if (!users.Find(x => x.id == parametrs[1]).admin.Contains(temp_desk.id)) users.Find(x => x.id == parametrs[1]).admin.Add(temp_desk.id);
@@ -1225,7 +1275,7 @@ namespace TaskManager
             }
         }
 
-
+        enum U { Owner = 2, Admin = 1, User = 0 }
 
         /*public bool SetDesk(Desk old_desk, Desk new_desk)//сменить одну доску на другую 
         {
