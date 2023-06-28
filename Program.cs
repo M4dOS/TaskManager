@@ -39,7 +39,6 @@ namespace TaskManager
             string daysDir = workDir + @"desks\";
             string logsDir = workDir + @"logs\";
 
-
             //подготовка датабазы 
             ApplicationConfiguration.Initialize();
             TaskM program = new(isDebug, new(logsDir, isDebug, new(), progname, version), args);
