@@ -31,21 +31,57 @@ namespace TaskManager
         private void InitializeComponent()
         {
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(TaskM));
+            button1 = new Button();
+            label1 = new Label();
             SuspendLayout();
+            // 
+            // button1
+            // 
+            button1.BackColor = Color.FromArgb(0, 0, 64);
+            button1.FlatAppearance.BorderSize = 0;
+            button1.FlatStyle = FlatStyle.Flat;
+            button1.Font = new Font("OCR-A BT", 14.25F, FontStyle.Regular, GraphicsUnit.Point);
+            button1.ForeColor = Color.White;
+            button1.Location = new Point(12, 1);
+            button1.Name = "button1";
+            button1.Size = new Size(144, 33);
+            button1.TabIndex = 1;
+            button1.Text = "change desk";
+            button1.UseVisualStyleBackColor = false;
+            // 
+            // label1
+            // 
+            label1.AutoSize = true;
+            label1.BackColor = Color.FromArgb(0, 0, 64);
+            label1.Font = new Font("OCR-A BT", 15.75F, FontStyle.Regular, GraphicsUnit.Point);
+            label1.ForeColor = Color.Transparent;
+            label1.Location = new Point(601, 9);
+            label1.Name = "label1";
+            label1.Size = new Size(217, 23);
+            label1.TabIndex = 3;
+            label1.Text = "user: random dude";
             // 
             // TaskM
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(800, 450);
+            BackColor = Color.FromArgb(192, 255, 255);
+            ClientSize = new Size(925, 523);
+            Controls.Add(label1);
+            Controls.Add(button1);
             Icon = (Icon)resources.GetObject("$this.Icon");
+            MaximizeBox = false;
+            MaximumSize = new Size(941, 1200);
             Name = "TaskM";
             Text = "{тут будет какое-то имя программы и его версия}";
             Load += TaskM_Load;
             Shown += TaskM_Shown;
             ResumeLayout(false);
+            PerformLayout();
         }
 
         #endregion
+        private Button button1;
+        private Label label1;
     }
 }

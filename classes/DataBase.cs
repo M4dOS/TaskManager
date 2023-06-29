@@ -1,4 +1,5 @@
-﻿using OfficeOpenXml;
+﻿using Microsoft.VisualBasic.ApplicationServices;
+using OfficeOpenXml;
 
 namespace TaskManager
 {
@@ -227,9 +228,7 @@ namespace TaskManager
         public bool AddTask(Task new_task)//добавление пункта в чек-листе 
         {
             bool cond = false;
-
             Card? old_task_card = GetCard(new_task.card_id);
-
             string fileTaskOld = desks_path + old_task_card.desk_id + ".desk";
 
             try
@@ -238,7 +237,6 @@ namespace TaskManager
 
                 if (desks.Find(x => x.id == old_task_card.desk_id).cards.Find(x => x.id == new_task.card_id) != null)
                 {
-                    
                     List<string> lines = ftold_context.Split('\n').ToList();
                     bool c = false;
                     bool incheck = false;
@@ -274,7 +272,6 @@ namespace TaskManager
                     LogState($"(AT1) Карточка \"{new_task.card_id}\" не найдена для добавления пункта");
                     cond = false;
                 }
-
                 if (cond)
                 {
                     File.WriteAllText(fileTaskOld, ftold_context);
@@ -335,7 +332,6 @@ namespace TaskManager
                     /*eoa71BFthJHwA6iY|задача 1|нужно что-то там сделать (зачемто)|0*/
                     string searchLine = delete_card.id + '|' + delete_card.name + '|' + delete_card.info + '|' + boolConvert(delete_card.done);//строка, которую нужно заменить 
 
-
                     //открываем файл для чтения и записи 
                     try
                     {
@@ -356,9 +352,9 @@ namespace TaskManager
                             {
                                 if (lineFound)
                                 {
-                                    while (temp_line.Split('|').Length != 4)
+                                    while (temp_line != null && temp_line.Split('|').Length != 4)
                                     {
-                                        temp_line = reader.ReadLine();
+                                            temp_line = reader.ReadLine();
                                     }
                                     writer.WriteLine(temp_line);
                                     lineFound = false;
@@ -925,9 +921,6 @@ namespace TaskManager
         }
         public bool MoveDesk(Desk move_desk, int zero_position)///смещение позиции доски в списке всех досок 
         { return true; }
-
-
-
 
         ////////////////////////////////////////////////////////////////////////////////////////
         ///////////////Базовые функции, не требующиеся в дальнейшем использовании///////////////
@@ -1803,5 +1796,152 @@ namespace TaskManager
                 return false;
             }
         }*/
+
+        ////////////////////////////////////////////////////////////////////////////////////////
+        /////////////////////////     Какая-то шлёпа из методов    /////////////////////////////
+        public void ShowCards(Desk desk)
+        {
+            for (int i = 0; i < desk.cards.Count; i++)
+            {
+                LogState(i + ".   " + desk.cards[i].name);
+            }
+        }
+        public List<Card> CardsReturn(Desk desk)
+        {
+            List<Card> cards = new List<Card>();
+            for (int i = 0; i < desk.cards.Count; i++)
+            {
+                cards.Add(desk.cards[i]);
+            }
+            return cards;
+        }
+        public Check TasksReturnCard(Card card)
+        {
+            Check check = card.checkList;
+            return check;
+        }
+        public List<Task> TasksReturnCheck(Check check)
+        {
+            List<Task> tasks = new List<Task>();
+            for (int i = 0; i < check.tasks.Count; i++)
+            {
+                tasks.Add(check.tasks[i]);
+                LogState(i + ".   " + check.tasks[i].name);
+            }
+            return tasks;
+        }
+        public string createId()
+        {
+            Random random = new Random();
+
+            const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+            string rnd = new string(Enumerable.Repeat(chars, 11).Select(s => s[random.Next(s.Length)]).ToArray());
+            return rnd;
+        }
+
+        public void TaskBoolChangerToTrue(Task task)
+        {
+            Card card;
+            Desk desk;
+            card = GetCard(task.card_id);
+            desk = GetDesk(card.desk_id);
+
+            string deskString = desk.id + ".desk";
+            string path = "data\\desks\\" + deskString;
+
+            var lines = File.ReadAllLines(path).ToList();
+
+            string itemSearch = task.name + "|0" ;
+            string itemChange = task.name + "|1" ;
+
+            int index = lines.FindIndex(s => s.Contains(itemSearch));
+            if (index != -1)
+            {
+                lines[index] = lines[index].Replace(itemSearch, itemChange);
+                File.WriteAllLines(path, lines);
+                task.done = true;
+            }
+
+/*            if (lines.FindIndex(s => s.Contains(itemSearch)) != null)
+            {
+                int index = lines.FindIndex(s => s.Contains(itemSearch));
+
+                lines[index] = lines[index].Replace(itemSearch, itemChange);
+
+                File.WriteAllLines(path, lines);
+            }*/
+        }
+        public void TaskBoolChangerToFalse(Task task)
+        {
+            Card card;
+            Desk desk;
+            card = GetCard(task.card_id);
+            desk = GetDesk(card.desk_id);
+
+            string deskString = desk.id + ".desk";
+            string path = "data\\desks\\" + deskString;
+
+            var lines = File.ReadAllLines(path).ToList();
+
+            string itemSearch = task.name + "|1";
+            string itemChange = task.name + "|0";
+
+            int index = lines.FindIndex(s => s.Contains(itemSearch));
+            if (index != -1)
+            {
+                lines[index] = lines[index].Replace(itemSearch, itemChange);
+                File.WriteAllLines(path, lines);
+                task.done = false;
+            }
+        }
+        public void ChangeNameCard(Card card, string nameNew)
+        {
+            Desk desk;
+            desk = GetDesk(card.desk_id);
+            string deskString = desk.id + ".desk";
+            string path = "data\\desks\\" + deskString;
+            var lines = File.ReadAllLines(path).ToList();
+            int doneInt;
+            if (card.done == true) doneInt = 1;
+            else doneInt = 0;
+
+            string itemSearch = card.id + "|" + card.name + "|" + card.info + "|" + doneInt;
+            string itemChange = card.id + "|" + nameNew + "|" + card.info + "|" + doneInt;
+            LogState(itemSearch);
+            LogState(itemChange);
+            int index = lines.FindIndex(s => s.Contains(itemSearch));
+            if (index != -1)
+            {
+                lines[index] = lines[index].Replace(itemSearch, itemChange);
+                File.WriteAllLines(path, lines);
+                card.name = nameNew;
+            }
+        }
+        public void DelCard(Card card)
+        {
+            bool checkDel = DeleteCard(card);
+            if (checkDel == false) LogState("delCard problem");
+        }
+        public void CreateTask(string name, string idCard)
+        {
+            bool done = false;
+            Task task = new Task(name, idCard);
+            bool check = AddTask(task);
+        }
+        public void CountParticipants(Card card) // добавить в форму
+        {
+            int countUsers = 0;
+            Desk desk;
+            desk = GetDesk(card.desk_id);
+            string deskString = desk.id + ".desk";
+            string path = "data\\desks\\" + deskString;
+            var lines = File.ReadAllLines(path).ToList();
+            foreach(string userID in user_ids)
+            {
+                string itemSearch = "|" + userID;
+                countUsers += lines.Count(line => line.Contains(itemSearch));
+            }
+            LogState( card.name + " users: " +  countUsers);
+        }
     }
 }

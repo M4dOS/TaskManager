@@ -13,6 +13,8 @@ namespace TaskManager
         public string desk_id; //идентификатор привязанной доски 
         public bool done; //состояние задачи 
 
+        public int xLocation;
+
         string IDCreator(DataBase db)//создание идентификатора 
         {
             int size = 12;
