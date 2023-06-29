@@ -31,20 +31,9 @@ namespace TaskManager
         private void InitializeComponent()
         {
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(TaskM));
-            pictureBox1 = new PictureBox();
             button1 = new Button();
             label1 = new Label();
-            ((System.ComponentModel.ISupportInitialize)pictureBox1).BeginInit();
             SuspendLayout();
-            // 
-            // pictureBox1
-            // 
-            pictureBox1.BackColor = Color.FromArgb(0, 0, 64);
-            pictureBox1.Location = new Point(-2, -2);
-            pictureBox1.Name = "pictureBox1";
-            pictureBox1.Size = new Size(932, 36);
-            pictureBox1.TabIndex = 0;
-            pictureBox1.TabStop = false;
             // 
             // button1
             // 
@@ -80,7 +69,6 @@ namespace TaskManager
             ClientSize = new Size(925, 523);
             Controls.Add(label1);
             Controls.Add(button1);
-            Controls.Add(pictureBox1);
             Icon = (Icon)resources.GetObject("$this.Icon");
             MaximizeBox = false;
             MaximumSize = new Size(941, 1200);
@@ -88,14 +76,11 @@ namespace TaskManager
             Text = "{тут будет какое-то имя программы и его версия}";
             Load += TaskM_Load;
             Shown += TaskM_Shown;
-            ((System.ComponentModel.ISupportInitialize)pictureBox1).EndInit();
             ResumeLayout(false);
             PerformLayout();
         }
 
         #endregion
-
-        private PictureBox pictureBox1;
         private Button button1;
         private Label label1;
     }

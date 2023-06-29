@@ -1928,7 +1928,7 @@ namespace TaskManager
             Task task = new Task(name, idCard);
             bool check = AddTask(task);
         }
-        public void CountParticipants(Card card)
+        public void CountParticipants(Card card) // добавить в форму
         {
             int countUsers = 0;
             Desk desk;
